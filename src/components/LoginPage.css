@@ -1,0 +1,522 @@
+/* LoginPage.css - Redesigned v2 */
+:root {
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-bg: rgba(20, 20, 30, 0.6);
+    --glass-shine: rgba(255, 255, 255, 0.03);
+    --primary-glow: conic-gradient(from 180deg at 50% 50%, #2a2a35 0deg, #1a1a25 360deg);
+}
+
+.login-page {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    overflow: hidden;
+    background: #050508;
+    /* Deep dark background */
+    color: white;
+}
+
+/* Background Effects */
+.ambient-glow {
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+    top: -100px;
+    left: -100px;
+    filter: blur(80px);
+    z-index: 0;
+    animation: pulseGlow 10s infinite alternate;
+}
+
+.ambient-glow-2 {
+    position: absolute;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, transparent 70%);
+    bottom: -100px;
+    right: -100px;
+    filter: blur(80px);
+    z-index: 0;
+    animation: pulseGlow 12s infinite alternate-reverse;
+}
+
+@keyframes pulseGlow {
+    0% {
+        transform: scale(1);
+        opacity: 0.5;
+    }
+
+    100% {
+        transform: scale(1.2);
+        opacity: 0.8;
+    }
+}
+
+.login-container {
+    width: 100%;
+    max-width: 1000px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+}
+
+/* Header */
+.logo-section {
+    text-align: center;
+    margin-bottom: 1rem;
+    animation: fadeInDown 0.8s ease-out;
+}
+
+.logo-icon svg {
+    width: 48px;
+    height: 48px;
+    filter: drop-shadow(0 0 15px rgba(99, 102, 241, 0.5));
+}
+
+.logo-text {
+    font-size: 2.5rem;
+    font-weight: 800;
+    letter-spacing: -0.05em;
+    margin-top: 1rem;
+    background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.logo-text span {
+    color: #6366f1;
+    /* Fallback */
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+}
+
+.tagline {
+    font-size: 1rem;
+    color: var(--color-text-secondary);
+    margin-top: 0.5rem;
+    font-weight: 400;
+}
+
+/* Portal Grid */
+.portal-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+    width: 100%;
+    perspective: 1000px;
+}
+
+.portal-card {
+    background: linear-gradient(180deg, rgba(30, 30, 40, 0.7) 0%, rgba(20, 20, 30, 0.9) 100%);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 2rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1.25rem;
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+    backdrop-filter: blur(10px);
+}
+
+.portal-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(800px circle at var(--mouse-x) var(--mouse-y), rgba(255, 255, 255, 0.06), transparent 40%);
+    opacity: 0;
+    transition: opacity 0.5s;
+}
+
+.portal-card:hover::before {
+    opacity: 1;
+}
+
+.portal-card:hover {
+    transform: translateY(-8px);
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+}
+
+.portal-card.active {
+    border-color: var(--active-color);
+    box-shadow: 0 0 0 1px var(--active-color), 0 0 30px var(--active-glow);
+    background: linear-gradient(180deg, rgba(30, 30, 40, 0.9) 0%, rgba(15, 15, 20, 1) 100%);
+}
+
+.portal-icon-wrapper {
+    width: 60px;
+    height: 60px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-secondary);
+    transition: all 0.3s ease;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.portal-icon-wrapper svg {
+    width: 28px;
+    height: 28px;
+    /* Force size constraint on Icons to prevent huge scaling */
+    min-width: 28px;
+    min-height: 28px;
+}
+
+.portal-card:hover .portal-icon-wrapper,
+.portal-card.active .portal-icon-wrapper {
+    background: var(--active-bg);
+    color: var(--active-color);
+    transform: scale(1.1) rotate(5deg);
+    box-shadow: 0 0 20px var(--active-glow);
+}
+
+.portal-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+    margin: 0;
+}
+
+.portal-desc {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    line-height: 1.4;
+    margin: 0;
+}
+
+/* Login/Transition Section */
+.login-content-wrapper {
+    display: grid;
+    grid-template-columns: 350px 1fr;
+    background: rgba(20, 20, 25, 0.95);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(20px);
+    animation: expandIn 0.5s ease-out forwards;
+    min-height: 500px;
+    position: relative;
+    margin-top: 1rem;
+}
+
+.login-sidebar {
+    background: linear-gradient(145deg, rgba(20, 20, 25, 0.9), rgba(10, 10, 15, 0.95));
+    padding: 3rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    border-right: 1px solid var(--glass-border);
+}
+
+.login-sidebar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--active-bg);
+    opacity: 0.3;
+    filter: blur(40px);
+}
+
+.sidebar-icon-large {
+    width: 120px;
+    height: 120px;
+    color: var(--active-color);
+    margin-bottom: 2rem;
+    filter: drop-shadow(0 0 30px var(--active-glow));
+    position: relative;
+    z-index: 1;
+}
+
+.sidebar-icon-large svg {
+    width: 100%;
+    height: 100%;
+}
+
+.sidebar-text {
+    position: relative;
+    z-index: 1;
+}
+
+.sidebar-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 0.5rem;
+}
+
+.sidebar-desc {
+    color: #94a3b8;
+    font-size: 0.95rem;
+}
+
+.login-form-section {
+    padding: 3.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.form-header {
+    margin-bottom: 2.5rem;
+}
+
+.form-title {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 0.5rem;
+}
+
+.form-subtitle {
+    color: #94a3b8;
+}
+
+/* Inputs */
+.input-group {
+    margin-bottom: 1.5rem;
+}
+
+.input-label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #cbd5e1;
+    margin-bottom: 0.5rem;
+}
+
+.input-field-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-icon {
+    position: absolute;
+    left: 1rem;
+    color: #64748b;
+    width: 20px;
+    height: 20px;
+    z-index: 2;
+}
+
+.input-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.form-input {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 1rem 1rem 1rem 3rem;
+    color: white;
+    font-size: 1rem;
+    transition: all 0.2s;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--active-color);
+    background: rgba(0, 0, 0, 0.3);
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.05);
+}
+
+.password-toggle {
+    position: absolute;
+    right: 1rem;
+    background: none;
+    border: none;
+    color: #64748b;
+    cursor: pointer;
+    padding: 2px;
+}
+
+.password-toggle svg {
+    width: 20px;
+    height: 20px;
+}
+
+.form-input:focus~.input-icon,
+.form-input:focus~.password-toggle {
+    color: var(--active-color);
+}
+
+/* Checkbox & Link */
+.form-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    font-size: 0.9rem;
+}
+
+.remember-me {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #94a3b8;
+    cursor: pointer;
+    user-select: none;
+}
+
+.custom-checkbox {
+    width: 18px;
+    height: 18px;
+    border: 2px solid #475569;
+    border-radius: 4px;
+    display: grid;
+    place-items: center;
+    transition: all 0.2s;
+}
+
+input[type="checkbox"] {
+    display: none;
+}
+
+input[type="checkbox"]:checked+.custom-checkbox {
+    background: var(--active-color);
+    border-color: var(--active-color);
+}
+
+.custom-checkbox svg {
+    width: 12px;
+    height: 12px;
+    color: white;
+    opacity: 0;
+    transform: scale(0.5);
+    transition: all 0.2s;
+}
+
+input[type="checkbox"]:checked+.custom-checkbox svg {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.forgot-link {
+    color: var(--active-color);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.forgot-link:hover {
+    text-decoration: underline;
+}
+
+/* Button */
+.submit-btn {
+    width: 100%;
+    padding: 1rem;
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--active-color) 0%, var(--active-bg) 200%);
+    /* Simpler gradient */
+    background-color: var(--active-color);
+    /* Fallback */
+    color: white;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.submit-btn:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.1);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.submit-btn:active {
+    transform: translateY(0);
+}
+
+.submit-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* Animations */
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes expandIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .portal-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .login-content-wrapper {
+        grid-template-columns: 1fr;
+        max-width: 500px;
+        margin: 0 auto;
+    }
+
+    .login-sidebar {
+        display: none;
+        /* Hide sidebar on mobile for cleaner look */
+    }
+}
+
+@media (max-width: 640px) {
+    .portal-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .login-page {
+        padding: 1rem;
+    }
+
+    .login-form-section {
+        padding: 2rem;
+    }
+}

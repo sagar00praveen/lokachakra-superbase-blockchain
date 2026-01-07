@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+:root {
+  /* Colors - Text */
+  --color-text-primary: #111827;
+  --color-text-muted: #6B7280;
+
+  /* Colors - Background */
+  --color-bg-primary: #F9FAFB;
+  --color-bg-secondary: #ffffff;
+  --color-bg-tertiary: #F3F4F6;
+  --color-bg-card: #ffffff;
+
+  /* Colors - Roles */
+  --color-hr-primary: #4F46E5;
+  /* Indigo 600 */
+  --color-hr-secondary: #4338CA;
+  /* Indigo 700 */
+
+  --color-it-primary: #059669;
+  /* Emerald 600 */
+  --color-candidate-primary: #9333EA;
+  /* Purple 600 */
+  --color-admin-primary: #DC2626;
+  /* Red 600 */
+
+  --color-accent-primary: #4F46E5;
+
+  /* Borders */
+  --border-color: #E5E7EB;
+
+  /* Spacing & Radius */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+  }
+}
+
+/* Custom Scrollbar for Sidebar */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out forwards;
+}
