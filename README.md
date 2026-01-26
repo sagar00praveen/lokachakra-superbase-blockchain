@@ -1,46 +1,56 @@
-# HR Nexus - Advanced HR & Recruitment Platform
+# Lokachakra Superbase Blockchain Project
 
-A scalable, secure, and user-friendly HR / Recruiter Dashboard built with React 19.
+This document explains how to set up and run the Lokachakra project. It includes steps for both the website component and the blockchain component.
 
-## 🚀 Features
+1. Prerequisites
 
-- **Role-Based Access Control (RBAC)**: Support for HR Admin, Recruiter, Hiring Manager, and Employees.
-- **Recruitment ATS**: Kanban-style applicant tracking system.
-- **HR Operations**: Employee management and analytics.
-- **Interactive Dashboard**: Real-time charts and KPIs using Recharts.
-- **Premium UI**: Modern dark-themed glassmorphism design.
+You need to have the following software installed on your computer:
+Node.js (for running the website)
+Rust (for the blockchain programming language)
+Solana Tool Suite (to interact with the blockchain)
+Anchor (the framework used for the Solana programs)
+Phantom Wallet (browser extension to sign transactions)
 
-## 🛠 Tech Stack
+2. Installation
 
-- **Frontend**: React 19, Vite
-- **Routing**: React Router Dom v6
-- **Styling**: Vanilla CSS (CSS Modules) with CSS Variables
-- **Icons**: Lucide React
-- **Charts**: Recharts
+First, open your terminal in the main folder of this project.
+Run the following command to install the website dependencies:
+npm install
 
-## 📂 Project Structure
+3. Setting up the Blockchain
 
-```
-src/
-├── components/   # Reusable UI components
-├── context/      # specific contexts (Auth, Theme)
-├── layouts/      # Page layouts (MainLayout, AuthLayout)
-├── mock/         # Mock data for development
-├── pages/        # Application pages (Dashboard, Recruitment, etc.)
-└── App.jsx       # Main application entry
-```
+The blockchain code lives in a specific subfolder. You must build and deploy it before using the app.
 
-## 🚦 Getting Started
+Step A: Navigate to the blockchain folder
+cd blockchain/lokachakra_verif
 
-1.  **Install Dependencies**
-    ```bash
-    npm install
-    ```
+Step B: Build the program
+anchor build
 
-2.  **Run Development Server**
-    ```bash
-    npm run dev
-    ```
+Step C: Deploy to Devnet
+Make sure your Solana CLI is set to devnet.
+anchor deploy
 
-3.  **Login Credentials (Mock)**
-    - Select a role on the login screen to simulate different user experiences.
+After deploying, you will get a Program ID. If this is a fresh deployment, make sure to update the Program ID in your frontend configuration files if it changed.
+
+4. Running the Website
+
+Once the blockchain is ready, go back to the main project folder.
+cd ../..
+
+Start the development server:
+npm run dev
+
+The terminal will show you a local address, usually http://localhost:5173. Open this in your web browser.
+
+5. How to Use
+
+Connect your Phantom Wallet when prompted on the website.
+Ensure your wallet is set to "Devnet" in its settings.
+You can now interact with the features, such as uploading documents to record proofs on the blockchain.
+
+6. Troubleshooting
+
+If you see an error saying "Not in workspace" when running anchor commands, it means you are in the wrong folder. Make sure you are inside "blockchain/lokachakra_verif" before running "anchor build" or "anchor deploy".
+
+If you see an error "custom program error: 0x0", it means the document has already been verified and exists on the blockchain.
