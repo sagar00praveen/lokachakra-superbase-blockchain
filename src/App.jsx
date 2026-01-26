@@ -3,11 +3,19 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { DashboardProvider } from './context/DashboardContext';
 import Layout from './components/layout/Layout';
 import PortalSelection from './pages/PortalSelection';
-import DashboardRouter from './pages/DashboardRouter';
+import RoleGuard from './components/auth/RoleGuard';
+
+// Dashboards
+import HRDashboard from './pages/dashboards/HRDashboard';
+import ITDashboard from './pages/dashboards/ITDashboard';
+import CandidateDashboard from './pages/dashboards/CandidateDashboard';
+import AdminDashboard from './pages/dashboards/AdminDashboard';
+
+// Pages
 import TeamsOverview from './pages/TeamsOverview';
 import TeamDetail from './pages/TeamDetail';
 import AddCandidate from './pages/AddCandidate';
-import SendOfferLetter from './pages/SendOfferLetter';
+import SendOfferLetter from './pages/hr/SendOfferLetter';
 import PayrollManagement from './pages/admin/PayrollManagement';
 import AnalyticsDashboard from './pages/admin/AnalyticsDashboard';
 import UserManagement from './pages/admin/UserManagement';
@@ -47,34 +55,81 @@ function App() {
           <Route path="/*" element={
             <Layout>
               <Routes>
-                <Route path="dashboard" element={<DashboardRouter />} />
-                <Route path="teams-overview" element={<TeamsOverview />} />
-                <Route path="add-candidate" element={<AddCandidate />} />
-                <Route path="send-offer-letter" element={<SendOfferLetter />} />
-                <Route path="hr/orientations" element={<OrientationManagement />} />
-                <Route path="hr/documents" element={<DocumentManagement />} />
-                <Route path="it/requests" element={<ITRequest />} />
-                <Route path="it/assets" element={<AssetManagement />} />
-                <Route path="it/assets/allocate" element={<AssetAllocation />} />
-                <Route path="it/orientations" element={<ITOrientation />} />
-                <Route path="it/settings" element={<ITSettings />} />
-                <Route path="candidate-profile/:id" element={<CandidateProfile />} />
-                <Route path="candidate/orientations" element={<MyOrientations />} />
-                <Route path="candidate/accept-offer" element={<AcceptOffer />} />
-                <Route path="candidate/policies" element={<PolicyAcceptance />} />
-                <Route path="candidate/device" element={<DeviceReceipt />} />
-                <Route path="candidate/profile" element={<PersonalInformation />} />
-                <Route path="candidate/notifications" element={<Notifications />} />
-                <Route path="candidate/documents" element={<UploadDocuments />} />
-                <Route path="admin/teams" element={<TeamsOverview />} />
-                <Route path="admin/teams/:id" element={<TeamDetail />} />
-                <Route path="admin/employees" element={<Employees />} />
-                <Route path="admin/users" element={<UserManagement />} />
-                <Route path="admin/settings" element={<Settings />} />
-                <Route path="admin/payroll" element={<PayrollManagement />} />
-                <Route path="admin/analytics" element={<AnalyticsDashboard />} />
-                {/* Fallback to dashboard if path matches nothing else under /* */}
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                {/* HR Routes */}
+                <Route path="hr/*" element={
+                  <RoleGuard requiredRole="hr">
+                    <Routes>
+                      <Route path="dashboard" element={<HRDashboard />} />
+                      <Route path="orientations" element={<OrientationManagement />} />
+                      <Route path="documents" element={<DocumentManagement />} />
+                      {/* Shared pages allowed for HR */}
+                      <Route path="add-candidate" element={<AddCandidate />} />
+                      <Route path="send-offer-letter" element={<SendOfferLetter />} />
+                      <Route path="candidate-profile/:id" element={<CandidateProfile />} />
+                      <Route path="*" element={<Navigate to="dashboard" replace />} />
+                    </Routes>
+                  </RoleGuard>
+                } />
+
+                {/* IT Routes */}
+                <Route path="it/*" element={
+                  <RoleGuard requiredRole="it">
+                    <Routes>
+                      <Route path="dashboard" element={<ITDashboard />} />
+                      <Route path="requests" element={<ITRequest />} />
+                      <Route path="assets" element={<AssetManagement />} />
+                      <Route path="assets/allocate" element={<AssetAllocation />} />
+                      <Route path="orientations" element={<ITOrientation />} />
+                      <Route path="settings" element={<ITSettings />} />
+                      <Route path="*" element={<Navigate to="dashboard" replace />} />
+                    </Routes>
+                  </RoleGuard>
+                } />
+
+                {/* Candidate Routes */}
+                <Route path="candidate/*" element={
+                  <RoleGuard requiredRole="candidate">
+                    <Routes>
+                      <Route path="dashboard" element={<CandidateDashboard />} />
+                      <Route path="orientations" element={<MyOrientations />} />
+                      <Route path="accept-offer" element={<AcceptOffer />} />
+                      <Route path="policies" element={<PolicyAcceptance />} />
+                      <Route path="device" element={<DeviceReceipt />} />
+                      <Route path="profile" element={<PersonalInformation />} />
+                      <Route path="notifications" element={<Notifications />} />
+                      <Route path="documents" element={<UploadDocuments />} />
+                      <Route path="*" element={<Navigate to="dashboard" replace />} />
+                    </Routes>
+                  </RoleGuard>
+                } />
+
+                {/* Admin Routes */}
+                <Route path="admin/*" element={
+                  <RoleGuard requiredRole="admin">
+                    <Routes>
+                      <Route path="dashboard" element={<AdminDashboard />} />
+                      <Route path="teams" element={<TeamsOverview />} />
+                      <Route path="teams/:id" element={<TeamDetail />} />
+                      <Route path="employees" element={<Employees />} />
+                      <Route path="users" element={<UserManagement />} />
+                      <Route path="settings" element={<Settings />} />
+                      <Route path="payroll" element={<PayrollManagement />} />
+                      <Route path="analytics" element={<AnalyticsDashboard />} />
+                      <Route path="*" element={<Navigate to="dashboard" replace />} />
+                    </Routes>
+                  </RoleGuard>
+                } />
+
+                {/* Shared/Top Level Redirections */}
+                {/* These routes (add-candidate, etc) if they were previously top-level,
+                     I've moved them under strict namespaces above or need to decide where they live.
+                     
+                     For backward compatibility or shared links, we can redirect legacy paths. */}
+                <Route path="add-candidate" element={<Navigate to="/hr/add-candidate" replace />} />
+                <Route path="send-offer-letter" element={<Navigate to="/hr/send-offer-letter" replace />} />
+
+                {/* Fallback */}
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Layout>
           } />

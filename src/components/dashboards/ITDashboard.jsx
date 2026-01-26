@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CheckSquare, Clock, Plus, Trash2, User, Mail, Shield } from 'lucide-react';
-import { USERS } from '../../mock/data';
+import { fetchProfiles, fetchCandidates, provisionCandidate } from '../../services/api';
 
 const ITDashboard = () => {
     // Task State
@@ -12,7 +12,31 @@ const ITDashboard = () => {
     ]);
 
     // User Management State
-    const [systemUsers, setSystemUsers] = useState(USERS);
+    const [systemUsers, setSystemUsers] = useState([]);
+
+    const [pendingCandidates, setPendingCandidates] = useState([]);
+
+    React.useEffect(() => {
+        const loadData = async () => {
+            try {
+                const [profiles, candidates] = await Promise.all([
+                    fetchProfiles(),
+                    fetchCandidates()
+                ]);
+                if (profiles) setSystemUsers(profiles);
+
+                // Filter candidates who likely don't have an auth user yet
+                // In a perfect world we check against profiles, but for now let's just show all recent ones
+                // or those with 'Applied' stage as a proxy for "Needs Setup"
+                if (candidates) {
+                    setPendingCandidates(candidates.filter(c => !profiles.find(p => p.email === c.email)));
+                }
+            } catch (error) {
+                console.error("Failed to load data", error);
+            }
+        };
+        loadData();
+    }, []);
     const [newUser, setNewUser] = useState({ name: '', email: '', role: 'EMPLOYEE' });
     const [showAddUser, setShowAddUser] = useState(false);
 
@@ -98,6 +122,51 @@ const ITDashboard = () => {
                             </div>
                         ))}
                     </div>
+                </div>
+
+                {/* Candidate Provisioning Section (NEW) */}
+                <div style={{ gridColumn: '1 / -1' }}>
+                    <h3 style={{ color: 'white', marginBottom: '1rem' }}>Pending Candidate Provisioning</h3>
+                    {pendingCandidates.length === 0 ? (
+                        <div style={{ color: 'var(--color-text-muted)', padding: '1rem', background: 'var(--color-bg-card)', borderRadius: '1rem', border: '1px solid var(--border-color)' }}>
+                            No pending candidates found.
+                        </div>
+                    ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+                            {pendingCandidates.map(candidate => (
+                                <div key={candidate.id} style={{ background: 'var(--color-bg-card)', padding: '1.25rem', borderRadius: '1rem', border: '1px solid var(--border-color)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--color-candidate-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold' }}>
+                                            {candidate.name.charAt(0)}
+                                        </div>
+                                        <div>
+                                            <h4 style={{ color: 'white', margin: 0 }}>{candidate.name}</h4>
+                                            <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>{candidate.email}</div>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={async () => {
+                                            if (confirm(`Create credentials for ${candidate.name}?`)) {
+                                                try {
+                                                    await provisionCandidate(candidate);
+                                                    alert(`Credentials created for ${candidate.name}!\nPassword: password1234567`);
+                                                    setPendingCandidates(pendingCandidates.filter(c => c.id !== candidate.id));
+                                                    // Refresh user list
+                                                    const newProfiles = await fetchProfiles();
+                                                    setSystemUsers(newProfiles);
+                                                } catch (e) {
+                                                    alert("Failed to provision: " + e.message);
+                                                }
+                                            }
+                                        }}
+                                        style={{ width: '100%', padding: '0.75rem', background: 'var(--color-it-primary)', color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                                    >
+                                        <Shield size={16} /> Generate Credentials
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {/* User Management Section */}

@@ -29,7 +29,7 @@ export const portalIcons = {
 export const portalInfo = {
     hr: {
         title: 'HR Portal',
-        subtitle: 'Human Resources',
+        subtitle: 'HR',
         formTitle: 'HR Login',
         formSubtitle: 'Access HR management system',
     },

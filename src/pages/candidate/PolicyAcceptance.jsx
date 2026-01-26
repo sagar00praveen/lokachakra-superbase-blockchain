@@ -33,7 +33,7 @@ const PolicyAcceptance = () => {
         }
         // Proceed logic here
         console.log('Accepted by:', fullName);
-        navigate('/dashboard'); // Or next step
+        navigate('/candidate/dashboard'); // Or next step
     };
 
     return (

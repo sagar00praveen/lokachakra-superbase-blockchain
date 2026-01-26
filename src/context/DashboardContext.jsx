@@ -16,6 +16,7 @@ export const DashboardProvider = ({ children }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [currentRole, setCurrentRole] = useState(null); // 'hr', 'it', 'candidate', 'admin'
     const [user, setUser] = useState(null);
+    const [authLoading, setAuthLoading] = useState(true);
 
     // Check for saved session on mount
     useEffect(() => {
@@ -26,6 +27,7 @@ export const DashboardProvider = ({ children }) => {
             setUser(JSON.parse(savedUser));
             setIsAuthenticated(true);
         }
+        setAuthLoading(false);
     }, []);
 
     const login = (role, userData) => {
@@ -56,6 +58,7 @@ export const DashboardProvider = ({ children }) => {
             setUser,
             isAuthenticated,
             currentRole,
+            authLoading, // Exported
             login,
             logout
         }}>

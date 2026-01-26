@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { createCandidate } from '../services/api';
 import {
     ArrowLeft,
     User,
@@ -90,35 +91,47 @@ const AddCandidate = () => {
     };
 
     const [submitted, setSubmitted] = useState(false);
+    const [submitError, setSubmitError] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        if (validateForm()) {
-            console.log('Form submitted:', formData);
+        setSubmitError('');
 
-            // Generate a simpler ID
-            const newId = `CAND-${Date.now().toString().slice(-6)}`;
+        console.log("Validating form...", formData);
 
-            const newCandidate = {
-                id: newId,
-                ...formData,
-                status: 'pending_it', // Initial status for IT to pick up
-                createdAt: new Date().toISOString(),
-                workflow: {
-                    hr_profile: true,
-                    it_credentials: false,
-                    it_assets: false,
-                    offer_sent: false
-                }
-            };
+        if (!validateForm()) {
+            console.log("Validation failed", errors);
+            setSubmitError("Please check the form for errors (indicated in red).");
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
 
-            // Save to localStorage
-            const existingCandidates = JSON.parse(localStorage.getItem('candidates') || '[]');
-            localStorage.setItem('candidates', JSON.stringify([newCandidate, ...existingCandidates]));
-
+        setIsSubmitting(true);
+        try {
+            console.log("Submitting to API...");
+            const result = await createCandidate(formData);
+            console.log("API Success:", result);
             setSubmitted(true);
+        } catch (error) {
+            console.error("Failed to create candidate", error);
+            setSubmitError(error.message || "Failed to create candidate. Please check your connection or permissions.");
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } finally {
+            setIsSubmitting(false);
         }
     };
+
+    // Auto-redirect effect when submitted becomes true
+    React.useEffect(() => {
+        if (submitted) {
+            const timer = setTimeout(() => {
+                navigate('/hr/dashboard');
+            }, 3000); // 3 seconds delay
+            return () => clearTimeout(timer);
+        }
+    }, [submitted, navigate]);
 
     if (submitted) {
         return (
@@ -133,15 +146,15 @@ const AddCandidate = () => {
                         <br /><br />
                         <span className="text-indigo-600 font-medium bg-indigo-50 px-3 py-1 rounded-lg">Next Step: IT Provisioning</span>
                         <br />
-                        A request has been sent to the IT team to generate credentials and allocate assets. Once complete, you will be notified to send the offer letter.
+                        Redirecting to Dashboard...
                     </p>
 
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                         <button
-                            onClick={() => navigate('/dashboard')}
+                            onClick={() => navigate('/hr/dashboard')}
                             className="w-full sm:w-auto px-8 py-3 bg-gray-900 text-white font-semibold rounded-xl hover:bg-black transition-colors shadow-lg"
                         >
-                            Return to Dashboard
+                            Return to Dashboard Now
                         </button>
                     </div>
                 </div>
@@ -160,7 +173,7 @@ const AddCandidate = () => {
         <div className="animate-fade-in-up max-w-4xl mx-auto">
             {/* Back Navigation */}
             <button
-                onClick={() => navigate('/dashboard')}
+                onClick={() => navigate('/hr/dashboard')}
                 className="flex items-center gap-2 text-gray-500 hover:text-indigo-600 mb-6 group transition-colors"
             >
                 <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
@@ -462,12 +475,31 @@ const AddCandidate = () => {
                     </button>
                     <button
                         type="submit"
-                        className="px-8 py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 hover:shadow-indigo-300 transition-all duration-200 flex items-center gap-2"
+                        disabled={isSubmitting}
+                        className={`
+                            px-8 py-3 bg-indigo-600 text-white font-semibold rounded-xl 
+                            shadow-lg shadow-indigo-200 transition-all duration-200 flex items-center gap-2
+                            ${isSubmitting ? 'opacity-70 cursor-wait' : 'hover:bg-indigo-700 hover:shadow-indigo-300'}
+                        `}
                     >
-                        <UserCheck size={20} />
-                        Create Candidate Profile
+                        {isSubmitting ? (
+                            <>
+                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                Creating...
+                            </>
+                        ) : (
+                            <>
+                                <UserCheck size={20} />
+                                Create Candidate Profile
+                            </>
+                        )}
                     </button>
                 </div>
+                {submitError && (
+                    <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-center animate-pulse">
+                        {submitError}
+                    </div>
+                )}
             </form>
         </div>
     );

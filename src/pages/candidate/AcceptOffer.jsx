@@ -1,21 +1,70 @@
-import React, { useState } from 'react';
-import { FileText, Upload, CheckCircle, XCircle, Download, Briefcase, DollarSign, Calendar, Building, Info, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { FileText, Upload, CheckCircle, XCircle, Download, Briefcase, DollarSign, Calendar, Building, Info, AlertTriangle, Loader2 } from 'lucide-react';
+import { updateCandidateStatus, createNotification, uploadSignedOfferLetter, updateCandidateOfferStatus, rejectCandidateOffer } from '../../services/api';
+import { supabase } from '../../lib/supabaseClient';
 
 const AcceptOffer = () => {
-    const [offerStatus, setOfferStatus] = useState('Pending'); // Pending, Accepted, Rejected
+    const [candidateId, setCandidateId] = useState(null);
+    const [candidateName, setCandidateName] = useState('');
+    const [offerStatus, setOfferStatus] = useState('loading'); // loading, Pending, Accepted, Rejected
+    const [offerLetterUrl, setOfferLetterUrl] = useState(null);
     const [signedLetter, setSignedLetter] = useState(null);
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [rejectReason, setRejectReason] = useState('');
-
-    // Mock Offer Data
-    const offerDetails = {
-        role: 'Senior Frontend Developer',
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [offerDetails, setOfferDetails] = useState({
+        role: 'Senior Developer', // Default/Placeholder
         department: 'Engineering',
-        joiningDate: '2026-02-01',
-        ctc: '$120,000 / Year',
+        joiningDate: 'TBD',
+        ctc: 'TBD',
         employmentType: 'Full-time',
-        offerDate: '2026-01-05'
-    };
+        offerDate: new Date().toLocaleDateString()
+    });
+
+    useEffect(() => {
+        const fetchCandidate = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                // Try to find candidate by company_email or personal_email
+                const { data, error } = await supabase
+                    .from('candidates')
+                    .select('*')
+                    .or(`company_email.eq.${user.email},personal_email.eq.${user.email}`)
+                    .single();
+
+                if (data) {
+                    setCandidateId(data.id);
+                    setCandidateName(data.name);
+                    setOfferLetterUrl(data.offer_letter_url);
+
+                    // Update offer details
+                    setOfferDetails(prev => ({
+                        ...prev,
+                        role: data.position || prev.role,
+                        department: data.department || prev.department,
+                        joiningDate: data.joining_date || prev.joiningDate,
+                        ctc: data.annual_ctc || prev.ctc,
+                        employmentType: data.employment_type || prev.employmentType
+                    }));
+
+                    // Strict Status Check
+                    if (data.offer_acceptance_status === 'accepted') {
+                        setOfferStatus('Accepted');
+                    } else if (data.offer_acceptance_status === 'rejected') {
+                        setOfferStatus('Rejected');
+                    } else {
+                        setOfferStatus('Pending');
+                    }
+                } else {
+                    console.error("No candidate record found for this user.");
+                    setOfferStatus('Pending');
+                }
+            } else {
+                setOfferStatus('Pending');
+            }
+        };
+        fetchCandidate();
+    }, []);
 
     const handleFileChange = (e) => {
         if (e.target.files && e.target.files[0]) {
@@ -23,22 +72,101 @@ const AcceptOffer = () => {
         }
     };
 
-    const handleAccept = () => {
+    const handleDownload = () => {
+        if (offerLetterUrl) {
+            window.open(offerLetterUrl, '_blank');
+        } else {
+            alert("No offer letter document found.");
+        }
+    };
+
+    const handleAccept = async () => {
         if (!signedLetter) {
             alert("Please upload the signed offer letter to proceed.");
             return;
         }
-        setOfferStatus('Accepted');
-        // Logic to notify HR & IT would go here (e.g., API call)
-        console.log("Offer Accepted. Notify HR/IT.");
+
+        setIsSubmitting(true);
+
+        try {
+            let signedUrl = null;
+            if (candidateId) {
+                // 1. Upload Signed Letter
+                try {
+                    signedUrl = await uploadSignedOfferLetter(candidateId, signedLetter);
+                } catch (uploadErr) {
+                    console.error("Upload failed", uploadErr);
+                    alert("Failed to upload document. Please try again.");
+                    setIsSubmitting(false);
+                    return;
+                }
+
+                // 2. Update Status using NEW function
+                await updateCandidateOfferStatus(candidateId, 'accepted');
+
+                // Keep the old status update for backward compatibility if needed, 
+                // OR simply rely on the new one? 
+                // The user said: "if that column is true the it is accepted ... make a column to store the rejection reason"
+                // They didn't explicitly say REMOVE the old status, but "make the changes".
+                // I'll update the old status too so the rest of the app (IT portal etc) signals 'offer_accepted'.
+                await updateCandidateStatus(candidateId, 'offer_accepted', {
+                    signed_offer_letter_url: signedUrl
+                });
+
+                // 3. Notify HR
+                await createNotification({
+                    recipient_role: 'hr',
+                    title: 'Offer Accepted',
+                    message: `${candidateName} has accepted the offer letter and uploaded the signed document.`,
+                    type: 'success',
+                    related_candidate_id: candidateId
+                });
+            } else {
+                console.warn("No Candidate ID found for status update.");
+            }
+            setOfferStatus('Accepted');
+        } catch (error) {
+            console.error("Error accepting offer:", error);
+            alert("Failed to accept offer. Please try again.");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
-    const handleRejectSubmit = () => {
-        setOfferStatus('Rejected');
-        setShowRejectModal(false);
-        // Logic to notify HR would go here
-        console.log("Offer Rejected. Reason:", rejectReason);
+    const handleRejectSubmit = async () => {
+        if (!rejectReason.trim()) {
+            alert("Please provide a reason for rejection.");
+            return;
+        }
+        try {
+            if (candidateId) {
+                // Use RPC to reset status and handle flags atomically
+                await rejectCandidateOffer(candidateId, rejectReason);
+
+                await createNotification({
+                    recipient_role: 'hr',
+                    title: 'Offer Rejected',
+                    message: `${candidateName} has rejected the offer. Reason: ${rejectReason}`,
+                    type: 'error',
+                    related_candidate_id: candidateId
+                });
+            }
+            setOfferStatus('Rejected');
+            setShowRejectModal(false);
+        } catch (error) {
+            console.error("Error rejecting offer:", error);
+            alert("Failed to reject offer. Please try again.");
+        }
     };
+
+    if (offerStatus === 'loading') {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh]">
+                <Loader2 className="animate-spin text-indigo-600 mb-4" size={48} />
+                <p className="text-gray-500">Loading offer details...</p>
+            </div>
+        );
+    }
 
     if (offerStatus === 'Accepted') {
         return (
@@ -150,7 +278,10 @@ const AcceptOffer = () => {
                                         <p className="text-xs text-gray-500">Please download, read carefully, and sign.</p>
                                     </div>
                                 </div>
-                                <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:border-indigo-300 hover:text-indigo-600 transition-all text-sm font-medium shadow-sm">
+                                <button
+                                    onClick={handleDownload}
+                                    className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:border-indigo-300 hover:text-indigo-600 transition-all text-sm font-medium shadow-sm"
+                                >
                                     <Download size={16} /> Download
                                 </button>
                             </div>
@@ -198,14 +329,14 @@ const AcceptOffer = () => {
                         <div className="space-y-3">
                             <button
                                 onClick={handleAccept}
-                                className={`w-full py-3.5 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-[0.98] flex items-center justify-center gap-2 ${signedLetter
-                                        ? 'bg-green-600 hover:bg-green-700 shadow-green-200'
-                                        : 'bg-gray-400 cursor-not-allowed'
+                                disabled={!signedLetter || isSubmitting}
+                                className={`w-full py-3.5 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-[0.98] flex items-center justify-center gap-2 ${signedLetter && !isSubmitting
+                                    ? 'bg-green-600 hover:bg-green-700 shadow-green-200'
+                                    : 'bg-gray-400 cursor-not-allowed'
                                     }`}
-                                disabled={!signedLetter}
                             >
-                                <CheckCircle size={20} />
-                                Accept Offer
+                                {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle size={20} />}
+                                {isSubmitting ? 'Processing...' : 'Accept Offer'}
                             </button>
 
                             <button
@@ -270,3 +401,5 @@ const AcceptOffer = () => {
 };
 
 export default AcceptOffer;
+
+

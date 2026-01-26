@@ -3,6 +3,7 @@ import { Users, UserCheck, Clock, Activity } from 'lucide-react';
 import StatCard from '../../components/dashboard/StatCard';
 import TeamPerformanceCard from '../../components/dashboard/TeamPerformanceCard';
 import ActiveCandidates from '../../components/dashboard/ActiveCandidates';
+import NotificationsTab from '../../components/dashboard/NotificationsTab';
 
 const HRDashboard = () => {
     return (
@@ -45,32 +46,27 @@ const HRDashboard = () => {
                 />
             </div>
 
-            {/* Performance Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <TeamPerformanceCard
-                    title="HR Team Performance"
-                    rate={0}
-                    colorClass="text-blue-500"
-                    metrics={[
-                        { label: 'Total Tasks', value: 11, icon: 'alert' },
-                        { label: 'Completed', value: 0, icon: 'check' },
-                        { label: 'Pending', value: 11, icon: 'clock' }
-                    ]}
-                />
-                <TeamPerformanceCard
-                    title="Onboarding Progress"
-                    rate={15}
-                    colorClass="text-emerald-500"
-                    metrics={[
-                        { label: 'In Progress', value: 6, icon: 'clock' },
-                        { label: 'Documents Pending', value: 4, icon: 'alert' },
-                        { label: 'Completed', value: 2, icon: 'check' }
-                    ]}
-                />
-            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Main Content Area (Candidates) */}
+                <div className="lg:col-span-2 space-y-6">
+                    <ActiveCandidates />
+                </div>
 
-            {/* Active Candidates */}
-            <ActiveCandidates />
+                {/* Right Sidebar (Notifications & Performance) */}
+                <div className="space-y-6">
+                    <NotificationsTab />
+                    <TeamPerformanceCard
+                        title="Onboarding Progress"
+                        rate={15}
+                        colorClass="text-emerald-500"
+                        metrics={[
+                            { label: 'In Progress', value: 6, icon: 'clock' },
+                            { label: 'Documents Pending', value: 4, icon: 'alert' },
+                            { label: 'Completed', value: 2, icon: 'check' }
+                        ]}
+                    />
+                </div>
+            </div>
         </div>
     );
 };

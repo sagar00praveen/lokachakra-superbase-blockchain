@@ -1,11 +1,28 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { fetchKPIs } from '../../services/api';
 import { Users, Building2, TrendingUp, Activity, Shield, Settings } from 'lucide-react';
 import StatCard from '../../components/dashboard/StatCard';
 import TeamPerformanceCard from '../../components/dashboard/TeamPerformanceCard';
 
 const AdminDashboard = () => {
+    const [userCount, setUserCount] = useState(127); // Default or loading state
+
+    useEffect(() => {
+        const loadStats = async () => {
+            try {
+                const kpis = await fetchKPIs();
+                if (kpis && kpis.userCount !== undefined) {
+                    setUserCount(kpis.userCount);
+                }
+            } catch (error) {
+                console.error("Failed to fetch KPIs", error);
+            }
+        };
+        loadStats();
+    }, []);
+
     const systemStats = [
-        { label: 'Total Users', value: 127, change: '+12%', trend: 'up' },
+        { label: 'Total Users', value: userCount, change: '+12%', trend: 'up' },
         { label: 'Active Sessions', value: 45, change: '+5%', trend: 'up' },
         { label: 'System Uptime', value: '99.9%', change: 'Excellent', trend: 'stable' },
         { label: 'Storage Used', value: '67%', change: '15GB free', trend: 'stable' }
@@ -31,7 +48,7 @@ const AdminDashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard
                     title="Total Users"
-                    count="127"
+                    count={userCount.toString()}
                     subtitle="+12% this month"
                     icon={Users}
                     iconBgClass="bg-blue-50 text-blue-600"

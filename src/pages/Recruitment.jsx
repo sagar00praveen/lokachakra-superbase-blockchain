@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, MoreHorizontal, Calendar, User } from 'lucide-react';
-import { CANDIDATES } from '../mock/data';
+import { fetchCandidates } from '../services/api';
 import styles from './Recruitment.module.css';
 
 const STAGES = ['Applied', 'Screening', 'Interview', 'Offer', 'Hired'];
@@ -26,7 +26,19 @@ const CandidateCard = ({ candidate }) => (
 );
 
 const Recruitment = () => {
-    const [candidates, setCandidates] = useState(CANDIDATES);
+    const [candidates, setCandidates] = useState([]);
+
+    React.useEffect(() => {
+        const loadCandidates = async () => {
+            try {
+                const data = await fetchCandidates();
+                if (data) setCandidates(data);
+            } catch (error) {
+                console.error("Failed to load candidates", error);
+            }
+        };
+        loadCandidates();
+    }, []);
 
     return (
         <div className={styles.container}>

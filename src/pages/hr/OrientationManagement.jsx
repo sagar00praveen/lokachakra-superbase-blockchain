@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Calendar,
     Clock,
@@ -11,52 +11,15 @@ import {
     ArrowRight,
     X
 } from 'lucide-react';
+import { fetchCandidates, createOrientation, fetchOrientations } from '../../services/api';
 import StatCard from '../../components/dashboard/StatCard';
 
 const OrientationManagement = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [sessions, setSessions] = useState([
-        {
-            id: 1,
-            title: 'Welcome & Company Introduction',
-            date: { day: '05', month: 'JAN' },
-            time: '10:00 AM - 11:30 AM',
-            mode: 'Virtual (Google Meet)',
-            attendees: [
-                { id: 1, name: 'Rajesh', initials: 'RK', color: 'bg-indigo-500' },
-                { id: 2, name: 'Priya', initials: 'PS', color: 'bg-pink-500' },
-                { id: 3, name: 'Amit', initials: 'AP', color: 'bg-emerald-500' },
-                { id: 4, name: '... +2', initials: '+2', color: 'bg-gray-400' },
-            ],
-            status: 'Upcoming'
-        },
-        {
-            id: 2,
-            title: 'HR Policies & Benefits Walkthrough',
-            date: { day: '05', month: 'JAN' },
-            time: '02:00 PM - 03:00 PM',
-            mode: 'Virtual (Google Meet)',
-            attendees: [
-                { id: 1, name: 'Rajesh', initials: 'RK', color: 'bg-indigo-500' },
-                { id: 2, name: 'Priya', initials: 'PS', color: 'bg-pink-500' },
-            ],
-            status: 'Upcoming'
-        },
-        {
-            id: 3,
-            title: 'Culture & Values Workshop',
-            date: { day: '07', month: 'JAN' },
-            time: '11:00 AM - 12:30 PM',
-            mode: 'Hybrid (Conf Room A)',
-            attendees: [
-                { id: 1, name: 'Amit', initials: 'AP', color: 'bg-emerald-500' },
-                { id: 2, name: 'Sarah', initials: 'SJ', color: 'bg-purple-500' },
-                { id: 3, name: 'Mike', initials: 'MC', color: 'bg-blue-500' },
-                { id: 4, name: '... +5', initials: '+5', color: 'bg-gray-400' },
-            ],
-            status: 'Scheduled'
-        }
-    ]);
+    const [selectedSession, setSelectedSession] = useState(null);
+    const [sessions, setSessions] = useState([]);
+    const [candidates, setCandidates] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     const [newSession, setNewSession] = useState({
         title: '',
@@ -70,12 +33,24 @@ const OrientationManagement = () => {
         candidates: []
     });
 
-    const mockCandidates = [
-        { id: 1, name: 'Rajesh Kumar', email: 'rajesh@company.com' },
-        { id: 2, name: 'Priya Sharma', email: 'priya@company.com' },
-        { id: 3, name: 'Amit Patel', email: 'amit@company.com' },
-        { id: 4, name: 'Sarah Jenkins', email: 'sarah@company.com' },
-    ];
+    useEffect(() => {
+        loadData();
+    }, []);
+
+    const loadData = async () => {
+        try {
+            const [fetchedCandidates, fetchedSessions] = await Promise.all([
+                fetchCandidates(),
+                fetchOrientations()
+            ]);
+            setCandidates(fetchedCandidates);
+            setSessions(fetchedSessions);
+        } catch (error) {
+            console.error("Failed to load data:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -94,50 +69,75 @@ const OrientationManagement = () => {
         }));
     };
 
-    const handleSchedule = (e) => {
+    const handleSchedule = async (e) => {
         e.preventDefault();
 
-        // Create new session
-        const dateObj = new Date(newSession.date);
-        const newSessionData = {
-            id: sessions.length + 1,
-            title: newSession.title,
-            date: {
+        try {
+            await createOrientation({
+                title: newSession.title,
+                date: newSession.date,
+                start_time: newSession.startTime,
+                end_time: newSession.endTime,
+                mode: newSession.mode,
+                meeting_link: newSession.meetingLink,
+                location: newSession.location,
+                description: newSession.description
+            }, newSession.candidates);
+
+            alert("Orientation Scheduled Successfully!");
+            setIsModalOpen(false);
+            setNewSession({
+                title: '',
+                date: '',
+                startTime: '',
+                endTime: '',
+                mode: 'Virtual',
+                meetingLink: '',
+                location: '',
+                description: '',
+                candidates: []
+            });
+            loadData(); // Refresh list
+        } catch (error) {
+            console.error("Error scheduling orientation:", error);
+            alert("Failed to schedule session. Please try again.");
+        }
+    };
+
+    // PROCESS SESSIONS FOR DISPLAY
+    const now = new Date();
+
+    const processedSessions = sessions.map(session => {
+        const sessionDateTime = new Date(`${session.date}T${session.end_time}`);
+        const startDateTime = new Date(`${session.date}T${session.start_time}`);
+        const isExpired = sessionDateTime < now;
+
+        const dateObj = new Date(session.date);
+
+        // Join Logic: 15 mins before start until end time
+        const joinWindowStart = new Date(startDateTime.getTime() - 15 * 60000);
+        const isJoinable = now >= joinWindowStart && now <= sessionDateTime;
+
+        return {
+            ...session,
+            displayDate: {
                 day: String(dateObj.getDate()).padStart(2, '0'),
                 month: dateObj.toLocaleString('en', { month: 'short' }).toUpperCase()
             },
-            time: `${newSession.startTime} - ${newSession.endTime}`,
-            mode: newSession.mode === 'Virtual'
-                ? `Virtual (${newSession.meetingLink || 'Google Meet'})`
-                : newSession.mode === 'Hybrid'
-                    ? `Hybrid (${newSession.location || 'TBD'})`
-                    : `In-Person (${newSession.location || 'TBD'})`,
-            attendees: newSession.candidates.map((id, index) => {
-                const candidate = mockCandidates.find(c => c.id === id);
-                return {
-                    id: candidate.id,
-                    name: candidate.name,
-                    initials: candidate.name.split(' ').map(n => n[0]).join(''),
-                    color: ['bg-indigo-500', 'bg-pink-500', 'bg-emerald-500', 'bg-purple-500'][index % 4]
-                };
-            }),
-            status: 'Upcoming'
+            formattedTime: `${session.start_time.slice(0, 5)} - ${session.end_time.slice(0, 5)}`,
+            displayStatus: isExpired ? 'Completed' : 'Upcoming',
+            isJoinable,
+            attendeesList: session.orientation_attendees?.map(a => ({
+                id: a.candidate?.id,
+                name: a.candidate?.name,
+                initials: a.candidate?.name ? a.candidate.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '??',
+                color: 'bg-indigo-500' // could randomize
+            })) || []
         };
+    });
 
-        setSessions([...sessions, newSessionData]);
-        setIsModalOpen(false);
-        setNewSession({
-            title: '',
-            date: '',
-            startTime: '',
-            endTime: '',
-            mode: 'Virtual',
-            meetingLink: '',
-            location: '',
-            description: '',
-            candidates: []
-        });
-    };
+    const upcomingSessions = processedSessions.filter(s => s.displayStatus === 'Upcoming');
+    const completedSessions = processedSessions.filter(s => s.displayStatus === 'Completed');
 
     return (
         <div className="space-y-8 animate-fade-in-up">
@@ -160,22 +160,28 @@ const OrientationManagement = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard
                     title="Total Scheduled"
-                    count={String(sessions.length)}
+                    count={String(upcomingSessions.length)}
                     subtitle="Upcoming sessions"
                     icon={Calendar}
                     iconBgClass="bg-indigo-50 text-indigo-600"
                 />
                 <StatCard
                     title="This Week"
-                    count="3"
+                    count={String(upcomingSessions.filter(s => {
+                        const d = new Date(s.date);
+                        const today = new Date();
+                        const nextWeek = new Date();
+                        nextWeek.setDate(today.getDate() + 7);
+                        return d >= today && d <= nextWeek;
+                    }).length)}
                     subtitle="Sessions this week"
                     icon={Clock}
                     iconBgClass="bg-blue-50 text-blue-600"
                 />
                 <StatCard
                     title="Completed"
-                    count="12"
-                    subtitle="Sessions (Last 30 days)"
+                    count={String(completedSessions.length)}
+                    subtitle="Sessions finished"
                     icon={CheckCircle2}
                     iconBgClass="bg-emerald-50 text-emerald-600"
                 />
@@ -199,61 +205,86 @@ const OrientationManagement = () => {
                     </div>
 
                     <div className="space-y-4">
-                        {sessions.map((session) => (
-                            <div key={session.id} className="bg-white rounded-2xl border border-gray-100 p-6 flex flex-col md:flex-row gap-6 hover:shadow-md transition-shadow group">
-                                {/* Date Badge */}
-                                <div className="flex flex-col items-center justify-center w-16 h-16 bg-gray-50 text-indigo-600 rounded-2xl border border-gray-100 shrink-0 group-hover:bg-indigo-50 group-hover:border-indigo-100 transition-colors">
-                                    <span className="text-xl font-bold leading-none">{session.date.day}</span>
-                                    <span className="text-xs font-bold uppercase mt-1 text-gray-400 group-hover:text-indigo-400">{session.date.month}</span>
-                                </div>
-
-                                {/* Content */}
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-start justify-between mb-2">
-                                        <h3 className="text-lg font-bold text-gray-900 line-clamp-1">{session.title}</h3>
-                                        <div className="flex items-center gap-2">
-                                            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
-                                                {session.status}
-                                            </span>
-                                            <button className="text-gray-400 hover:text-gray-600">
-                                                <MoreHorizontal size={18} />
-                                            </button>
+                        <div className="space-y-4">
+                            {upcomingSessions.length === 0 ? (
+                                <p className="text-gray-500 text-center py-8">No upcoming sessions scheduled.</p>
+                            ) : (
+                                upcomingSessions.map((session) => (
+                                    <div key={session.id} className="bg-white rounded-2xl border border-gray-100 p-6 flex flex-col md:flex-row gap-6 hover:shadow-md transition-shadow group">
+                                        {/* Date Badge */}
+                                        <div className="flex flex-col items-center justify-center w-16 h-16 bg-gray-50 text-indigo-600 rounded-2xl border border-gray-100 shrink-0 group-hover:bg-indigo-50 group-hover:border-indigo-100 transition-colors">
+                                            <span className="text-xl font-bold leading-none">{session.displayDate.day}</span>
+                                            <span className="text-xs font-bold uppercase mt-1 text-gray-400 group-hover:text-indigo-400">{session.displayDate.month}</span>
                                         </div>
-                                    </div>
 
-                                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-4">
-                                        <div className="flex items-center gap-1.5">
-                                            <Clock size={14} />
-                                            {session.time}
-                                        </div>
-                                        <div className="flex items-center gap-1.5">
-                                            {session.mode.includes('Virtual') ? <Video size={14} /> : <MapPin size={14} />}
-                                            {session.mode}
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center justify-between">
-                                        {/* Attendees */}
-                                        <div className="flex -space-x-2">
-                                            {session.attendees.map((attendee) => (
-                                                <div
-                                                    key={attendee.id}
-                                                    className={`w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white ${attendee.color}`}
-                                                    title={attendee.name}
-                                                >
-                                                    {attendee.initials}
+                                        {/* Content */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-start justify-between mb-2">
+                                                <h3 className="text-lg font-bold text-gray-900 line-clamp-1">{session.title}</h3>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
+                                                        {session.displayStatus}
+                                                    </span>
+                                                    <button className="text-gray-400 hover:text-gray-600">
+                                                        <MoreHorizontal size={18} />
+                                                    </button>
                                                 </div>
-                                            ))}
-                                        </div>
+                                            </div>
 
-                                        {/* Action */}
-                                        <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm shadow-indigo-100">
-                                            Join & Start
-                                        </button>
+                                            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-4">
+                                                <div className="flex items-center gap-1.5">
+                                                    <Clock size={14} />
+                                                    {session.formattedTime}
+                                                </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    {session.mode.includes('Virtual') ? <Video size={14} /> : <MapPin size={14} />}
+                                                    {session.mode}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between">
+                                                {/* Attendees */}
+                                                <div className="flex -space-x-2">
+                                                    {session.attendeesList && session.attendeesList.map((attendee, idx) => (
+                                                        <div
+                                                            key={idx}
+                                                            className={`w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white ${attendee.color}`}
+                                                            title={attendee.name}
+                                                        >
+                                                            {attendee.initials}
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {/* Actions: Join & View Details */}
+                                                <div className="flex gap-3">
+                                                    {session.mode === 'Virtual' && session.meeting_link && (
+                                                        <button
+                                                            onClick={() => window.open(session.meeting_link, '_blank')}
+                                                            disabled={!session.isJoinable}
+                                                            className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors shadow-sm flex items-center gap-2 ${session.isJoinable
+                                                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-100'
+                                                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                                }`}
+                                                            title={session.isJoinable ? "Click to join meeting" : "Join button activates 15 mins before start time"}
+                                                        >
+                                                            <Video size={16} />
+                                                            Join
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => setSelectedSession(session)}
+                                                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm shadow-indigo-100"
+                                                    >
+                                                        View Details
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
-                        ))}
+                                ))
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -437,7 +468,7 @@ const OrientationManagement = () => {
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-3">Select Candidates</label>
                                 <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-xl p-3">
-                                    {mockCandidates.map((candidate) => (
+                                    {candidates.map((candidate) => (
                                         <label
                                             key={candidate.id}
                                             className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
@@ -450,7 +481,7 @@ const OrientationManagement = () => {
                                             />
                                             <div className="flex-1">
                                                 <p className="text-sm font-medium text-gray-900">{candidate.name}</p>
-                                                <p className="text-xs text-gray-500">{candidate.email}</p>
+                                                <p className="text-xs text-gray-500">{candidate.email || candidate.personal_email}</p>
                                             </div>
                                         </label>
                                     ))}
@@ -477,6 +508,99 @@ const OrientationManagement = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+            {/* Session Details Modal */}
+            {selectedSession && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-scale-in">
+                        <div className="bg-indigo-600 px-6 py-4 flex items-center justify-between text-white">
+                            <h2 className="text-lg font-bold">Session Details</h2>
+                            <button
+                                onClick={() => setSelectedSession(null)}
+                                className="p-1 hover:bg-indigo-700 rounded-lg transition-colors"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-6">
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900 mb-1">{selectedSession.title}</h3>
+                                <div className="flex flex-wrap gap-3 text-sm text-gray-500 mt-2">
+                                    <div className="flex items-center gap-1.5">
+                                        <Calendar size={14} />
+                                        {selectedSession.date}
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <Clock size={14} />
+                                        {selectedSession.formattedTime}
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        {selectedSession.mode.includes('Virtual') ? <Video size={14} /> : <MapPin size={14} />}
+                                        {selectedSession.mode}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {selectedSession.description && (
+                                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                    <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Description</h4>
+                                    <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                                        {selectedSession.description}
+                                    </p>
+                                </div>
+                            )}
+
+                            {selectedSession.mode === 'Virtual' && selectedSession.meeting_link && (
+                                <div>
+                                    <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Meeting Link</h4>
+                                    <a href={selectedSession.meeting_link} target="_blank" rel="noopener noreferrer" className="text-indigo-600 underline text-break-all text-sm">
+                                        {selectedSession.meeting_link}
+                                    </a>
+                                </div>
+                            )}
+
+                            <div>
+                                <h4 className="text-xs font-bold text-gray-400 uppercase mb-3">Attendees ({selectedSession.attendeesList.length})</h4>
+                                <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                                    {selectedSession.attendeesList.length > 0 ? (
+                                        selectedSession.attendeesList.map((attendee, idx) => (
+                                            <div key={idx} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg transition-colors">
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${attendee.color} shrink-0`}>
+                                                    {attendee.initials}
+                                                </div>
+                                                <span className="text-sm font-medium text-gray-700">{attendee.name}</span>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-sm text-gray-400 italic">No attendees added.</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="pt-4 flex justify-end gap-3 border-t border-gray-100">
+                                <button
+                                    onClick={() => setSelectedSession(null)}
+                                    className="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors"
+                                >
+                                    Close
+                                </button>
+                                {selectedSession.mode === 'Virtual' && selectedSession.meeting_link && (
+                                    <button
+                                        onClick={() => window.open(selectedSession.meeting_link, '_blank')}
+                                        disabled={!selectedSession.isJoinable}
+                                        className={`px-4 py-2 font-medium rounded-lg transition-colors flex items-center gap-2 ${selectedSession.isJoinable
+                                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                            }`}
+                                    >
+                                        Join Session
+                                    </button>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

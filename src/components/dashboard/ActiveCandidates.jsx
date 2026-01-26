@@ -1,46 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MoreHorizontal, Plus, Search, Filter, Calendar } from 'lucide-react';
+import { MoreHorizontal, Plus, Search, Filter, Calendar, CheckCircle, XCircle } from 'lucide-react';
+import { fetchCandidates } from '../../services/api';
 
 const ActiveCandidates = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
+    const [candidates, setCandidates] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    // Load candidates from localStorage, fallback to mock data if empty
-    const [candidates] = useState(() => {
-        const saved = JSON.parse(localStorage.getItem('candidates') || '[]');
-        if (saved.length > 0) {
-            return saved.map(c => ({
-                id: c.id,
-                name: c.fullName,
-                role: c.position,
-                dept: c.department,
-                progress: c.status === 'completed' ? 100 : (c.status === 'offer_sent' ? 75 : (c.status === 'pending_offer' ? 50 : 25)),
-                status: c.status === 'completed' ? 'Completed' : (c.status === 'offer_sent' ? 'Onboarding' : (c.status === 'pending_offer' ? 'Action Required' : 'In Progress')),
-                joiningDate: c.joiningDate || 'TBD',
-                initials: c.fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase(),
-                color: 'bg-indigo-500', // Dynamic colors could be added
-                rawStatus: c.status // Keep raw status for logic
-            }));
-        }
-        return [
-            { name: 'Sai', role: 'Software Engineer', dept: 'Sales', progress: 100, status: 'Completed', joiningDate: '2025-12-15', initials: 'S', color: 'bg-emerald-500' },
-            { name: 'Nagasai Chimmilli', role: 'Software Engineer', dept: 'HR', progress: 15, status: 'Pending', joiningDate: '2026-01-20', initials: 'NC', color: 'bg-purple-500' },
-            { name: 'Sai Ch', role: 'DevOps Engineer', dept: 'Engineering', progress: 45, status: 'In Progress', joiningDate: '2026-01-10', initials: 'SC', color: 'bg-blue-500' },
-            { name: 'Rahul Verma', role: 'Frontend Developer', dept: 'Engineering', progress: 60, status: 'In Progress', joiningDate: '2026-01-05', initials: 'RV', color: 'bg-orange-500' },
-            { name: 'Ravi Kumar', role: 'Backend Developer', dept: 'IT', progress: 0, status: 'Pending', joiningDate: '2026-02-01', initials: 'RK', color: 'bg-pink-500' },
-            { name: 'Anita Desai', role: 'Product Designer', dept: 'Product', progress: 100, status: 'Completed', joiningDate: '2025-12-01', initials: 'AD', color: 'bg-indigo-500' }
-        ];
-    });
+    useEffect(() => {
+        const loadCandidates = async () => {
+            try {
+                const data = await fetchCandidates();
+                const mappedCandidates = data.map(c => ({
+                    id: c.id,
+                    name: c.name,
+                    role: c.position,
+                    dept: c.department,
+                    status: (c.status === 'offer_accepted' || c.status === 'Completed') ? 'Completed' :
+                        (c.status === 'offer_sent' || c.status === 'Offer Sent') ? 'Offer Sent' :
+                            (c.status === 'offer_rejected' ? 'Offer Rejected' :
+                                (c.status === 'pending_offer' ? 'Action Required' :
+                                    (c.status === 'Provisioned' ? 'In Progress' : 'Pending'))),
+                    joiningDate: c.joining_date || 'TBD',
+                    initials: c.name ? c.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '??',
+                    color: 'bg-indigo-500',
+                    rawStatus: c.status,
+                    provisionedAt: c.provisioned_at,
+                    sentOffer: c.sent_offer_letter,
+                    credentialsCreated: c.credentials_created,
+                    offerAcceptanceStatus: c.offer_acceptance_status // Map the new column
+                }));
+                setCandidates(mappedCandidates);
+            } catch (error) {
+                console.error("Failed to fetch candidates:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    const tabs = ['All', 'Pending', 'In Progress', 'Action Required', 'Completed'];
+        loadCandidates();
+    }, []);
+
+    const tabs = ['All', 'Pending', 'In Progress', 'Action Required', 'Offer Sent', 'Completed', 'Rejected'];
 
     const filteredCandidates = candidates.filter(candidate => {
-        // Map tab names to status logic
         const matchesTab = activeTab === 'All' ||
             (activeTab === 'Action Required' && candidate.status === 'Action Required') ||
             (activeTab === 'Pending' && (candidate.status === 'Pending' || candidate.status === 'In Progress')) ||
+            (activeTab === 'Offer Sent' && candidate.status === 'Offer Sent') ||
+            (activeTab === 'Rejected' && candidate.status === 'Offer Rejected') ||
             candidate.status === activeTab;
 
         const matchesSearch = candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -51,11 +62,52 @@ const ActiveCandidates = () => {
     const getStatusColor = (status) => {
         switch (status) {
             case 'Completed': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-            case 'Onboarding': return 'bg-blue-100 text-blue-700 border-blue-200';
-            case 'Action Required': return 'bg-red-100 text-red-700 border-red-200';
-            case 'In Progress': return 'bg-orange-100 text-orange-700 border-orange-200';
+            case 'Offer Sent': return 'bg-blue-100 text-blue-700 border-blue-200';
+            case 'Offer Rejected': return 'bg-red-100 text-red-700 border-red-200';
+            case 'Action Required': return 'bg-orange-100 text-orange-700 border-orange-200';
+            case 'In Progress': return 'bg-indigo-100 text-indigo-700 border-indigo-200';
             default: return 'bg-gray-100 text-gray-700 border-gray-200';
         }
+    };
+
+    const renderAction = (candidate) => {
+        // Allow sending offer if:
+        // 1. Status is in pending/provisioned state
+        // 2. OR Offer was explicitly rejected (even if status is Completed/Provisioned)
+        // 3. AND Offer hasn't been re-sent yet (sentOffer is false)
+        const isRejected = candidate.offerAcceptanceStatus === 'rejected';
+        const canSendOffer = ['Applied', 'Pending', 'pending_offer', 'Provisioned', 'offer_rejected'].includes(candidate.rawStatus) || isRejected;
+
+        if (canSendOffer && !candidate.sentOffer) {
+            // Further validation to ensure we don't show it for totally unrelated statuses if needed, 
+            // but isRejected check is strong.
+            if (candidate.rawStatus !== 'offer_sent') {
+                return (
+                    <button
+                        onClick={() => navigate('/hr/send-offer-letter', { state: { candidateId: candidate.id } })}
+                        className="text-indigo-600 hover:text-indigo-900 font-semibold text-xs border border-indigo-200 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-colors"
+                    >
+                        Send Offer
+                    </button>
+                );
+            }
+        }
+
+        if ((candidate.rawStatus === 'offer_sent' || candidate.rawStatus === 'Offer Sent') && !candidate.provisionedAt) {
+            return (
+                <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-100">
+                    Need IT Credentials
+                </span>
+            );
+        }
+
+        return (
+            <button
+                className="text-gray-400 hover:text-indigo-600 transition-colors p-2 rounded-lg hover:bg-gray-100"
+            >
+                <MoreHorizontal size={20} />
+            </button>
+        );
     };
 
     return (
@@ -67,7 +119,7 @@ const ActiveCandidates = () => {
                 </div>
                 <div className="flex items-center gap-3">
                     <button
-                        onClick={() => navigate('/add-candidate')}
+                        onClick={() => navigate('/hr/add-candidate')}
                         className="px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-lg shadow-indigo-200"
                     >
                         <Plus size={18} />
@@ -76,7 +128,6 @@ const ActiveCandidates = () => {
                 </div>
             </div>
 
-            {/* Filters and Search */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
                 <div className="flex bg-gray-50 p-1 rounded-xl w-full md:w-auto overflow-x-auto">
                     {tabs.map(tab => (
@@ -112,7 +163,8 @@ const ActiveCandidates = () => {
                             <th className="text-left py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider pl-6">Candidate</th>
                             <th className="text-left py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Role & Dept</th>
                             <th className="text-left py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Joining Date</th>
-                            <th className="text-left py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider w-1/5">Progress</th>
+                            <th className="text-left py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Sent Offer Letter</th>
+                            <th className="text-left py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Credentials Created</th>
                             <th className="text-left py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
                             <th className="text-center py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Action</th>
                         </tr>
@@ -123,7 +175,7 @@ const ActiveCandidates = () => {
                                 <td className="py-4 px-4 pl-6">
                                     <div
                                         className="flex items-center gap-3 cursor-pointer group/item"
-                                        onClick={() => navigate(`/candidate-profile/${candidate.id}`)}
+                                        onClick={() => navigate(`/hr/candidate-profile/${candidate.id}`)}
                                     >
                                         <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm text-white shadow-sm ${candidate.color}`}>
                                             {candidate.initials}
@@ -144,17 +196,26 @@ const ActiveCandidates = () => {
                                     </div>
                                 </td>
                                 <td className="py-4 px-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                                            <div
-                                                className={`h-full rounded-full transition-all duration-500 ${candidate.progress === 100 ? 'bg-emerald-500' :
-                                                    candidate.progress >= 50 ? 'bg-indigo-500' : 'bg-orange-400'
-                                                    }`}
-                                                style={{ width: `${candidate.progress}%` }}
-                                            />
+                                    {candidate.sentOffer ? (
+                                        <div className="flex items-center gap-2 text-emerald-600 font-semibold text-xs">
+                                            <CheckCircle size={16} /> Sent
                                         </div>
-                                        <span className="text-xs font-bold text-gray-600 w-8 text-right">{candidate.progress}%</span>
-                                    </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2 text-gray-400 font-semibold text-xs">
+                                            <XCircle size={16} /> Pending
+                                        </div>
+                                    )}
+                                </td>
+                                <td className="py-4 px-4">
+                                    {candidate.credentialsCreated ? (
+                                        <div className="flex items-center gap-2 text-emerald-600 font-semibold text-xs">
+                                            <CheckCircle size={16} /> Created
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2 text-gray-400 font-semibold text-xs">
+                                            <XCircle size={16} /> Pending
+                                        </div>
+                                    )}
                                 </td>
                                 <td className="py-4 px-4">
                                     <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${getStatusColor(candidate.status)}`}>
@@ -162,27 +223,14 @@ const ActiveCandidates = () => {
                                     </span>
                                 </td>
                                 <td className="py-4 px-4 text-center">
-                                    {candidate.rawStatus === 'pending_offer' ? (
-                                        <button
-                                            onClick={() => navigate('/send-offer-letter', { state: { candidateId: candidate.id } })}
-                                            className="text-indigo-600 hover:text-indigo-900 font-semibold text-xs border border-indigo-200 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-colors"
-                                        >
-                                            Send Offer
-                                        </button>
-                                    ) : (
-                                        <button
-                                            className="text-gray-400 hover:text-indigo-600 transition-colors p-2 rounded-lg hover:bg-gray-100"
-                                        >
-                                            <MoreHorizontal size={20} />
-                                        </button>
-                                    )}
+                                    {renderAction(candidate)}
                                 </td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };
 

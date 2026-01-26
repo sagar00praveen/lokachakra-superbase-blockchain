@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Clock, CheckCircle, AlertCircle, Inbox, Mail, Key, User, ArrowRight, X, Copy, RefreshCw, Info, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { fetchCandidates, provisionCandidate } from '../../services/api';
 
 const ITRequest = () => {
     const navigate = useNavigate();
@@ -8,6 +9,7 @@ const ITRequest = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     // Derived state for password visibility
     const [showPassword, setShowPassword] = useState(false);
@@ -25,46 +27,47 @@ const ITRequest = () => {
         }
     });
 
-    // Load requests from localStorage or use mock data
-    const [requests, setRequests] = useState(() => {
-        const savedCandidates = JSON.parse(localStorage.getItem('candidates') || '[]');
-        if (savedCandidates.length > 0) {
-            return savedCandidates.map(c => ({
+    const [requests, setRequests] = useState([]);
+
+    useEffect(() => {
+        loadRequests();
+    }, []);
+
+    const loadRequests = async () => {
+        try {
+            setLoading(true);
+            const data = await fetchCandidates();
+
+            // Map API data to UI model
+            const mappedRequests = data.map(c => ({
                 id: c.id,
-                candidateName: c.fullName,
-                initials: c.fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase(),
+                candidateName: c.name || c.full_name,
+                initials: (c.name || c.full_name || '??').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase(),
                 role: c.position,
                 department: c.department,
-                joiningDate: c.joiningDate,
-                status: c.status === 'pending_it' ? 'Pending' : (c.status === 'pending_assets' ? 'In Progress' : (c.status === 'pending_offer' || c.status === 'offer_sent' ? 'Completed' : 'Pending')),
-                progress: c.status === 'pending_it' ? 0 : (c.status === 'pending_assets' ? 30 : 100),
-                baseEmail: c.personalEmail ? c.personalEmail.split('@')[0] : ''
+                joiningDate: c.joining_date,
+                // Status mapping:
+                // 'Applied' -> Pending
+                // 'Provisioned' but no assets -> In Progress (Needs Assets)
+                // 'Active' / 'Allocated' OR has assigned_assets_summary -> Completed
+                status: (c.stage === 'Applied' || c.stage === 'Pending IT') ? 'Pending'
+                    : (c.stage === 'Provisioned' && (!c.assigned_assets_summary || c.assigned_assets_summary.length === 0)) ? 'In Progress'
+                        : (c.stage === 'Active' || c.stage === 'Allocated' || (c.assigned_assets_summary && c.assigned_assets_summary.length > 0)) ? 'Completed'
+                            : 'Pending',
+                progress: (c.stage === 'Applied' || c.stage === 'Pending IT') ? 0
+                    : (c.stage === 'Provisioned' && (!c.assigned_assets_summary || c.assigned_assets_summary.length === 0)) ? 50
+                        : 100,
+                baseEmail: c.personal_email ? c.personal_email.split('@')[0] : '',
+                raw: c // Keep raw data if needed
             }));
+
+            setRequests(mappedRequests);
+        } catch (error) {
+            console.error("Failed to load requests", error);
+        } finally {
+            setLoading(false);
         }
-        return [
-            {
-                id: 'REQ-001',
-                candidateName: 'Sarah Jenkins',
-                initials: 'SJ',
-                role: 'Product Designer',
-                department: 'Product',
-                joiningDate: '2026-01-15',
-                status: 'Pending',
-                progress: 0,
-                baseEmail: 'sarah.jenkins'
-            },
-            {
-                id: 'REQ-002',
-                candidateName: 'Michael Ross',
-                initials: 'MR',
-                role: 'Legal Counsel',
-                department: 'Legal',
-                joiningDate: '2026-01-10',
-                status: 'In Progress',
-                progress: 60,
-            }
-        ];
-    });
+    };
 
     // Stats
     const stats = {
@@ -95,46 +98,37 @@ const ITRequest = () => {
         return Array(12).fill(0).map(() => chars[Math.floor(Math.random() * chars.length)]).join('');
     };
 
-    const handleCredentialsSubmit = (e) => {
+    const handleCredentialsSubmit = async (e) => {
         e.preventDefault();
 
-        // Mock Validation
+        // Validation
         if (!credentialsForm.email.includes('@')) return alert("Invalid email format");
 
-        // Update request status locally
-        const updatedRequests = requests.map(r =>
-            r.id === selectedRequest.id
-                ? { ...r, status: 'In Progress', progress: 30 }
-                : r
-        );
-        setRequests(updatedRequests);
+        try {
+            await provisionCandidate(selectedRequest.raw, {
+                companyEmail: credentialsForm.email,
+                companyPassword: credentialsForm.password
+            });
 
-        // Update in localStorage
-        const savedCandidates = JSON.parse(localStorage.getItem('candidates') || '[]');
-        const updatedCandidates = savedCandidates.map(c => {
-            if (c.id === selectedRequest.id) {
-                return {
-                    ...c,
-                    status: 'pending_assets',
-                    itUserInfo: credentialsForm,
-                    workflow: { ...c.workflow, it_credentials: true }
-                };
-            }
-            return c;
-        });
-        localStorage.setItem('candidates', JSON.stringify(updatedCandidates));
+            // Close modal
+            setShowCredentialsModal(false);
 
-        // Close modal
-        setShowCredentialsModal(false);
+            // Redirect to Asset Management
+            navigate('/it/assets/allocate', {
+                state: {
+                    message: `Credentials created for ${selectedRequest.candidateName}. Now assign assets.`,
+                    candidateId: selectedRequest.id,
+                    candidateName: selectedRequest.candidateName
+                }
+            });
 
-        // Redirect to Asset Management
-        navigate('/it/assets/allocate', {
-            state: {
-                message: `Credentials created for ${selectedRequest.candidateName}. Now assign assets.`,
-                candidateId: selectedRequest.id,
-                candidateName: selectedRequest.candidateName
-            }
-        });
+            // Refresh list (though we navigate away, so maybe not strictly needed, but good practice if user comes back)
+            loadRequests();
+
+        } catch (error) {
+            console.error("Provisioning failed", error);
+            alert("Failed to create credentials: " + error.message);
+        }
     };
 
     const filteredRequests = requests.filter(req => {
@@ -268,6 +262,13 @@ const ITRequest = () => {
                                                 className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
                                             >
                                                 Create Credentials
+                                            </button>
+                                        ) : req.status === 'In Progress' ? (
+                                            <button
+                                                onClick={() => navigate('/it/assets/allocate', { state: { candidateId: req.id, candidateName: req.candidateName } })}
+                                                className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-1 ml-auto"
+                                            >
+                                                Assign Assets
                                             </button>
                                         ) : (
                                             <button disabled className="px-4 py-2 bg-gray-100 text-gray-400 text-xs font-bold rounded-lg cursor-not-allowed">

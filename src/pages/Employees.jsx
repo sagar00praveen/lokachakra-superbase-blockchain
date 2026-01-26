@@ -1,12 +1,26 @@
 import React, { useState } from 'react';
 import { Search, Filter, MoreVertical, Mail, Phone, Edit2, X } from 'lucide-react';
-import { EMPLOYEES } from '../mock/data';
+import { fetchEmployees } from '../services/api';
 import styles from './Employees.module.css';
 
 const Employees = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterDept, setFilterDept] = useState('All');
-    const [employees, setEmployees] = useState(EMPLOYEES);
+    const [employees, setEmployees] = useState([]);
+
+    React.useEffect(() => {
+        const loadEmployees = async () => {
+            try {
+                const data = await fetchEmployees();
+                if (data && data.length > 0) {
+                    setEmployees(data);
+                }
+            } catch (error) {
+                console.error("Failed to fetch employees", error);
+            }
+        };
+        loadEmployees();
+    }, []);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [newEmployee, setNewEmployee] = useState({
         name: '',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDashboard } from '../context/DashboardContext';
 import {
@@ -6,14 +6,15 @@ import {
     Lock,
     Eye,
     EyeOff,
-    ArrowRight,
     CheckCircle2,
     Building2,
     Shield,
     Users,
     Monitor,
-    UserCheck
+    UserCheck,
+    ChevronLeft
 } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
 
 const Login = () => {
     const navigate = useNavigate();
@@ -29,180 +30,233 @@ const Login = () => {
     // Role Configuration
     const roles = {
         hr: {
-            title: 'HR Portal',
+            title: 'Human Resources',
             icon: Users,
-            color: 'from-blue-600 to-cyan-600',
-            textColor: 'text-blue-600',
-            bgLight: 'bg-blue-50',
-            email: 'priya.sharma@lokachakra.com'
+            color: 'text-blue-500',
+            bg: 'bg-blue-50',
+            accent: 'ring-blue-500/20'
         },
         it: {
-            title: 'IT Portal',
+            title: 'IT Operations',
             icon: Monitor,
-            color: 'from-emerald-600 to-teal-600',
-            textColor: 'text-emerald-600',
-            bgLight: 'bg-emerald-50',
-            email: 'vikram.singh@lokachakra.com'
+            color: 'text-emerald-500',
+            bg: 'bg-emerald-50',
+            accent: 'ring-emerald-500/20'
         },
         candidate: {
             title: 'Candidate Portal',
             icon: UserCheck,
-            color: 'from-purple-600 to-pink-600',
-            textColor: 'text-purple-600',
-            bgLight: 'bg-purple-50',
-            email: 'rajesh.kumar@email.com'
+            color: 'text-purple-500',
+            bg: 'bg-purple-50',
+            accent: 'ring-purple-500/20'
         },
         admin: {
-            title: 'Admin Portal',
+            title: 'Administration',
             icon: Shield,
-            color: 'from-orange-600 to-red-600',
-            textColor: 'text-orange-600',
-            bgLight: 'bg-orange-50',
-            email: 'admin@lokachakra.com'
+            color: 'text-orange-500',
+            bg: 'bg-orange-50',
+            accent: 'ring-orange-500/20'
         }
     };
 
     const currentRole = roles[roleParam] || roles.hr;
     const RoleIcon = currentRole.icon;
 
-    useEffect(() => {
-        setEmail(currentRole.email);
-    }, [currentRole]);
+    const [isSignUp, setIsSignUp] = useState(false);
+    const [errorMsg, setErrorMsg] = useState('');
+    const [successMsg, setSuccessMsg] = useState('');
 
-    const handleLogin = (e) => {
+    const handleAuth = async (e) => {
         e.preventDefault();
         setIsLoading(true);
+        setErrorMsg('');
+        setSuccessMsg('');
 
-        // Mock Login Delay
-        setTimeout(() => {
-            const userData = {
-                name: currentRole.email.split('@')[0].replace('.', ' ').split(' ').map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(' '),
-                email: currentRole.email,
-                role: roleParam.toUpperCase()
-            };
-            login(roleParam, userData);
-            navigate('/dashboard');
-        }, 1500);
+        try {
+            if (isSignUp) {
+                // Sign Up Logic
+                const { data, error } = await supabase.auth.signUp({
+                    email: email,
+                    password: password,
+                });
+
+                if (error) throw error;
+
+                if (data?.user) {
+                    setSuccessMsg("Account created! You can now sign in.");
+                    setIsSignUp(false); // Switch back to login
+                }
+            } else {
+                // Sign In Logic
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: email,
+                    password: password,
+                });
+
+                if (error) throw error;
+
+                if (data?.user) {
+                    const userData = {
+                        email: data.user.email,
+                        id: data.user.id,
+                        role: roleParam.toUpperCase()
+                    };
+                    login(roleParam, userData);
+
+                    // Redirect to specific dashboard based on role
+                    const dashboardRoutes = {
+                        'hr': '/hr/dashboard',
+                        'it': '/it/dashboard',
+                        'candidate': '/candidate/dashboard',
+                        'admin': '/admin/dashboard'
+                    };
+
+                    navigate(dashboardRoutes[roleParam] || '/');
+                }
+            }
+        } catch (err) {
+            console.error("Auth error:", err);
+            setErrorMsg(err.message || "Authentication failed");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
-        <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2">
-            {/* Left Side: Visuals */}
-            <div className={`hidden lg:flex flex-col justify-between p-12 bg-gradient-to-br ${currentRole.color} text-white relative overflow-hidden transition-all duration-500`}>
-                {/* Abstract Shapes */}
-                <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
-                <div className="absolute bottom-0 left-0 w-96 h-96 bg-black/10 rounded-full blur-3xl -ml-32 -mb-32"></div>
-
-                <div className="relative z-10">
-                    <div className="flex items-center gap-3 mb-8">
-                        <div className="p-2 bg-white/20 backdrop-blur-sm rounded-xl">
-                            <Building2 size={24} />
-                        </div>
-                        <span className="text-xl font-bold tracking-wide">HR Nexus</span>
-                    </div>
-                </div>
-
-                <div className="relative z-10 max-w-lg">
-                    <h1 className="text-5xl font-bold mb-6 leading-tight">
-                        Welcome to the <br />
-                        <span className="opacity-90">{currentRole.title}</span>
-                    </h1>
-                    <p className="text-lg opacity-80 mb-8 leading-relaxed">
-                        Securely access your dashboard to manage workflows, view updates, and collaborate with your team.
-                    </p>
-
-                    <div className="flex items-center gap-4 bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20">
-                        <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-gray-900 shadow-lg">
-                            <CheckCircle2 size={24} className={currentRole.textColor} />
-                        </div>
-                        <div>
-                            <p className="font-bold text-lg">Secure Login</p>
-                            <p className="text-sm opacity-75">End-to-end encrypted session</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="relative z-10 text-sm opacity-60">
-                    © 2026 LokaChakra Inc. All rights reserved.
-                </div>
+        <div className="min-h-screen bg-[#F5F5F7] flex flex-col items-center justify-center p-6 font-sans relative overflow-hidden">
+            {/* Ambient Background Mesh */}
+            <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
+                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-100 rounded-full blur-[120px] opacity-60 animate-pulse" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-100 rounded-full blur-[120px] opacity-60 animate-pulse" style={{ animationDelay: '1s' }} />
             </div>
 
-            {/* Right Side: Login Form */}
-            <div className="flex items-center justify-center p-6 bg-white">
-                <div className="w-full max-w-md space-y-8 animate-fade-in-up">
-                    <div className="text-center lg:text-left">
-                        <div className={`inline-flex p-4 rounded-2xl ${currentRole.bgLight} ${currentRole.textColor} mb-6`}>
+            {/* Back Button */}
+            <button
+                onClick={() => navigate('/')}
+                className="absolute top-8 left-8 p-3 bg-white/60 backdrop-blur-xl border border-white/40 rounded-full shadow-sm hover:scale-105 transition-all z-20"
+            >
+                <ChevronLeft size={20} className="text-gray-600" />
+            </button>
+
+            {/* Login Card */}
+            <div className="w-full max-w-[440px] z-10 animate-fade-in-up">
+                <div className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-[40px] p-10 relative overflow-hidden">
+
+                    {/* Header */}
+                    <div className="flex flex-col items-center text-center mb-8">
+                        <div className={`
+                            p-4 rounded-2xl mb-6 shadow-sm
+                            ${currentRole.bg} ${currentRole.color}
+                        `}>
                             <RoleIcon size={32} />
                         </div>
-                        <h2 className="text-3xl font-bold text-gray-900">Sign in to your account</h2>
-                        <p className="text-gray-500 mt-2">Enter your credentials to access the portal</p>
+                        <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mb-2">
+                            {isSignUp ? 'Create Account' : 'Welcome Back'}
+                        </h1>
+                        <p className="text-gray-500 font-medium text-sm">
+                            {isSignUp ? `Register for ${currentRole.title}` : `Sign in to ${currentRole.title}`}
+                        </p>
                     </div>
 
-                    <form onSubmit={handleLogin} className="space-y-6">
-                        <div className="space-y-2">
-                            <label className="text-sm font-semibold text-gray-700">Email Address</label>
+                    <form onSubmit={handleAuth} className="space-y-5">
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider ml-1">Email</label>
                             <div className="relative group">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-900 transition-colors" size={18} />
                                 <input
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-medium"
+                                    className="w-full pl-11 pr-4 py-3.5 bg-white/50 border border-transparent shadow-sm rounded-2xl focus:bg-white focus:ring-4 focus:ring-gray-100 outline-none transition-all font-medium text-gray-900 placeholder:text-gray-400"
                                     placeholder="name@company.com"
+                                    required
                                 />
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                                <label className="text-sm font-semibold text-gray-700">Password</label>
-                                <a href="#" className="text-sm font-semibold text-indigo-600 hover:text-indigo-700">Forgot password?</a>
-                            </div>
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider ml-1">Password</label>
                             <div className="relative group">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-900 transition-colors" size={18} />
                                 <input
                                     type={showPassword ? "text" : "password"}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full pl-12 pr-12 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-medium"
-                                    placeholder="Enter your password"
+                                    className="w-full pl-11 pr-12 py-3.5 bg-white/50 border border-transparent shadow-sm rounded-2xl focus:bg-white focus:ring-4 focus:ring-gray-100 outline-none transition-all font-medium text-gray-900 placeholder:text-gray-400"
+                                    placeholder="••••••••"
+                                    required
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                                 >
-                                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
                             </div>
                         </div>
+
+                        <div className="flex items-center justify-between px-1">
+                            <div className="flex items-center gap-2">
+                                <CheckCircle2 size={16} className="text-emerald-500" />
+                                <span className="text-xs text-gray-500 font-medium">Secure Connection</span>
+                            </div>
+                            <a href="#" className="text-xs font-semibold text-gray-900 hover:text-black hover:underline">
+                                Help signing in?
+                            </a>
+                        </div>
+
+                        {/* Success Message Display */}
+                        {successMsg && (
+                            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600 text-sm font-medium flex items-center gap-2">
+                                <CheckCircle2 size={16} />
+                                {successMsg}
+                            </div>
+                        )}
+
+                        {/* Error Message Display */}
+                        {errorMsg && (
+                            <div className="p-3 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm font-medium flex items-center gap-2 animate-pulse">
+                                <span className="block w-1.5 h-1.5 rounded-full bg-red-500" />
+                                {errorMsg}
+                            </div>
+                        )}
 
                         <button
                             type="submit"
                             disabled={isLoading}
                             className={`
-                                w-full py-4 rounded-xl text-white font-bold text-lg shadow-xl 
-                                transform hover:-translate-y-0.5 transition-all duration-200
-                                flex items-center justify-center gap-2
-                                bg-gradient-to-r ${currentRole.color}
-                                ${isLoading ? 'opacity-80 cursor-wait' : 'hover:shadow-2xl'}
+                                w-full py-3.5 rounded-2xl text-white font-semibold text-lg shadow-lg shadow-gray-200
+                                transform active:scale-[0.98] transition-all duration-200
+                                bg-gray-900 hover:bg-black
+                                flex items-center justify-center gap-2 mt-2
+                                ${isLoading ? 'opacity-80 cursor-wait' : ''}
                             `}
                         >
                             {isLoading ? (
-                                <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                             ) : (
-                                <>
-                                    Sign In <ArrowRight size={20} />
-                                </>
+                                isSignUp ? "Create Account" : "Sign In"
                             )}
                         </button>
                     </form>
+                </div>
 
-                    <div className="mt-8 pt-6 border-t border-gray-100 text-center">
-                        <p className="text-sm text-gray-500">
-                            Don't have an account? <span className="font-bold text-gray-900 cursor-pointer hover:underline">Contact IT Support</span>
-                        </p>
-                    </div>
+                {/* Footer */}
+                <div className="text-center mt-8">
+                    <p className="text-sm text-gray-500">
+                        {isSignUp ? "Already have an account? " : "Don't have an account? "}
+                        <button
+                            onClick={() => {
+                                setIsSignUp(!isSignUp);
+                                setErrorMsg('');
+                                setSuccessMsg('');
+                            }}
+                            className="font-bold text-gray-900 cursor-pointer hover:underline focus:outline-none"
+                        >
+                            {isSignUp ? "Sign In" : "Sign Up"}
+                        </button>
+                    </p>
                 </div>
             </div>
         </div>

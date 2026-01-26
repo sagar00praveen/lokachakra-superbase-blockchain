@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     BarChart,
     Bar,
@@ -14,24 +14,35 @@ import {
 import { Clock, CheckCircle2, Users, FileText, TrendingUp, Filter, Download } from 'lucide-react';
 import StatCard from '../../components/dashboard/StatCard';
 
-const AnalyticsDashboard = () => {
-    // Mock Data for Charts
-    const onboardingTrendData = [
-        { month: 'Jul', completed: 12, pending: 4 },
-        { month: 'Aug', completed: 18, pending: 6 },
-        { month: 'Sep', completed: 15, pending: 3 },
-        { month: 'Oct', completed: 22, pending: 8 },
-        { month: 'Nov', completed: 25, pending: 5 },
-        { month: 'Dec', completed: 30, pending: 7 },
-    ];
+import { fetchAnalyticsData } from '../../services/api';
 
-    const departmentData = [
-        { dept: 'Engineering', rate: 85 },
-        { dept: 'Sales', rate: 70 },
-        { dept: 'Product', rate: 90 },
-        { dept: 'Marketing', rate: 75 },
-        { dept: 'HR', rate: 95 },
-    ];
+const AnalyticsDashboard = () => {
+    const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState({
+        openPositions: 0,
+        activeCandidates: 0,
+        pendingOffers: 0,
+        completedOnboarding: 0
+    });
+    const [onboardingTrendData, setTrendData] = useState([]);
+    const [departmentData, setDepartmentData] = useState([]);
+
+    useEffect(() => {
+        loadAnalytics();
+    }, []);
+
+    const loadAnalytics = async () => {
+        try {
+            const data = await fetchAnalyticsData();
+            setStats(data.stats);
+            setTrendData(data.trendData);
+            setDepartmentData(data.departmentData);
+        } catch (error) {
+            console.error("Failed to load analytics:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <div className="space-y-8 animate-fade-in-up">
@@ -58,27 +69,27 @@ const AnalyticsDashboard = () => {
                 <StatCard
                     title="Avg Time to Onboard"
                     count="5.2 Days"
-                    subtitle="-12% vs last month"
+                    subtitle="Estimated"
                     icon={Clock}
                     iconBgClass="bg-indigo-50 text-indigo-600"
                 />
                 <StatCard
-                    title="Completion Rate"
-                    count="92%"
-                    subtitle="Target: 90%"
+                    title="Completed"
+                    count={String(stats.completedOnboarding)}
+                    subtitle="Fully Onboarded"
                     icon={CheckCircle2}
                     iconBgClass="bg-emerald-50 text-emerald-600"
                 />
                 <StatCard
                     title="Active Candidates"
-                    count="24"
-                    subtitle="Currently onboarding"
+                    count={String(stats.activeCandidates)}
+                    subtitle="Total in pipeline"
                     icon={Users}
                     iconBgClass="bg-blue-50 text-blue-600"
                 />
                 <StatCard
                     title="Pending Offers"
-                    count="8"
+                    count={String(stats.pendingOffers)}
                     subtitle="Awaiting response"
                     icon={FileText}
                     iconBgClass="bg-orange-50 text-orange-600"

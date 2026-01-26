@@ -1,25 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Search, Monitor, Laptop, Smartphone, Printer, HardDrive, Plus, X, Truck, MapPin, Save, CheckCircle, Package, ArrowRight, ArrowLeft } from 'lucide-react';
+import { fetchAssets, allocateAsset, unallocateAsset, updateCandidateAssetsSummary } from '../../services/api';
 
 const AssetAllocation = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const { candidateName, candidateId } = location.state || { candidateName: 'Sarah Jenkins', candidateId: 'REQ-001' };
+    const { candidateName, candidateId } = location.state || {}; // Removing fallbacks to avoid confusion in real app
 
-    const [availableAssets, setAvailableAssets] = useState([
-        { id: 'AS-101', name: 'Dell Latitude 7420', type: 'Laptop', serial: 'DL-7420-001', icon: Laptop },
-        { id: 'AS-102', name: 'MacBook Pro M2', type: 'Laptop', serial: 'MBP-M2-005', icon: Laptop },
-        { id: 'AS-201', name: 'Dell Ultrasharp 27"', type: 'Monitor', serial: 'DU-27-045', icon: Monitor },
-        { id: 'AS-202', name: 'LG 27" 4K', type: 'Monitor', serial: 'LG-4K-012', icon: Monitor },
-        { id: 'AS-301', name: 'iPhone 15', type: 'Mobile', serial: 'IP-15-889', icon: Smartphone },
-        { id: 'AS-401', name: 'Logitech MX Master 3', type: 'Accessory', serial: 'LOG-MX3-442', icon: HardDrive },
-        { id: 'AS-402', name: 'Keychron K2', type: 'Accessory', serial: 'KC-K2-110', icon: HardDrive },
-        { id: 'AS-501', name: 'Jabra Evolve 75', type: 'Headset', serial: 'JB-75-001', icon: HardDrive },
-    ]);
-
+    const [availableAssets, setAvailableAssets] = useState([]);
     const [allocatedAssets, setAllocatedAssets] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
+    const [loading, setLoading] = useState(true);
 
     // Work Setup Form
     const [wfhStatus, setWfhStatus] = useState('Hybrid');
@@ -32,14 +24,69 @@ const AssetAllocation = () => {
         address: '123 Main St, Springfield'
     });
 
-    const handleAllocate = (asset) => {
-        setAllocatedAssets([...allocatedAssets, asset]);
-        setAvailableAssets(availableAssets.filter(a => a.id !== asset.id));
+    useEffect(() => {
+        if (!candidateId) {
+            alert('No candidate selected. Returning to dashboard.');
+            navigate('/it/dashboard');
+            return;
+        }
+        loadAssets();
+    }, [candidateId, navigate]);
+
+    const loadAssets = async () => {
+        try {
+            setLoading(true);
+            const allAssets = await fetchAssets();
+
+            // Filter assets: Available ones + those assigned to THIS candidate
+            const available = allAssets.filter(a => a.status === 'Available');
+            const assigned = allAssets.filter(a => a.assigned_to === candidateId || (a.status === 'Allocated' && a.assigned_to == candidateId)); // Check strict and loose equality if types differ
+
+            setAvailableAssets(available);
+            setAllocatedAssets(assigned);
+        } catch (error) {
+            console.error("Failed to load assets", error);
+            alert("Failed to load assets inventory.");
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleRemove = (asset) => {
-        setAvailableAssets([...availableAssets, asset]);
-        setAllocatedAssets(allocatedAssets.filter(a => a.id !== asset.id));
+    const handleAllocate = async (asset) => {
+        try {
+            // Optimistic update
+            setAllocatedAssets([...allocatedAssets, asset]);
+            setAvailableAssets(availableAssets.filter(a => a.id !== asset.id));
+
+            await allocateAsset(asset.id, candidateId);
+        } catch (error) {
+            console.error("Allocation failed", error);
+            alert("Failed to allocate asset.");
+            loadAssets(); // Revert
+        }
+    };
+
+    const handleRemove = async (asset) => {
+        try {
+            // Optimistic update
+            setAvailableAssets([...availableAssets, asset]);
+            setAllocatedAssets(allocatedAssets.filter(a => a.id !== asset.id));
+
+            await unallocateAsset(asset.id);
+        } catch (error) {
+            console.error("Unallocation failed", error);
+            alert("Failed to remove asset.");
+            loadAssets(); // Revert
+        }
+    };
+
+    const getIcon = (type) => {
+        switch (type) {
+            case 'Laptop': return Laptop;
+            case 'Monitor': return Monitor;
+            case 'Mobile': return Smartphone;
+            default: return HardDrive;
+        }
     };
 
     const filteredAssets = availableAssets.filter(asset =>
@@ -47,34 +94,19 @@ const AssetAllocation = () => {
         asset.type.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const handleComplete = () => {
-        // Logic to save allocation
-        const savedCandidates = JSON.parse(localStorage.getItem('candidates') || '[]');
-
-        let found = false;
-        const updatedCandidates = savedCandidates.map(c => {
-            if (c.id === candidateId) {
-                found = true;
-                return {
-                    ...c,
-                    status: 'pending_offer',
-                    assets: allocatedAssets,
-                    workflow: { ...c.workflow, it_assets: true }
-                };
-            }
-            return c;
-        });
-
-        if (found) {
-            localStorage.setItem('candidates', JSON.stringify(updatedCandidates));
-            alert(`Allocation complete for ${candidateName}! Assets assigned: ${allocatedAssets.length}. Sent to HR.`);
-        } else {
-            // Fallback for mock data that isn't in local storage
-            console.warn("Candidate ID not found in storage, assuming mock run.");
-            alert(`Allocation complete for ${candidateName}! (Mock Mode)`);
+    const handleComplete = async () => {
+        try {
+            // Save the summary of assets to the candidate record
+            await updateCandidateAssetsSummary(candidateId, allocatedAssets);
+            alert(`Allocation complete for ${candidateName}! Assets assigned: ${allocatedAssets.length}.`);
+            navigate('/it/dashboard'); // Go back to IT dashboard
+        } catch (error) {
+            console.error("Failed to update candidate asset summary:", error);
+            // We still alert success for allocation because that part likely succeeded (real-time), 
+            // but warn about summary.
+            alert("Allocation recorded, but candidate profile summary update failed.");
+            navigate('/it/dashboard');
         }
-
-        navigate('/it/requests');
     };
 
     return (
@@ -98,26 +130,29 @@ const AssetAllocation = () => {
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
                     {filteredAssets.length > 0 ? (
-                        filteredAssets.map((asset) => (
-                            <div
-                                key={asset.id}
-                                className="group p-3 bg-white border border-gray-200 rounded-xl hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer flex items-center justify-between"
-                                onClick={() => handleAllocate(asset)}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center text-gray-500 group-hover:text-indigo-600 transition-colors">
-                                        <asset.icon size={20} />
+                        filteredAssets.map((asset) => {
+                            const Icon = getIcon(asset.type);
+                            return (
+                                <div
+                                    key={asset.id}
+                                    className="group p-3 bg-white border border-gray-200 rounded-xl hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer flex items-center justify-between"
+                                    onClick={() => handleAllocate(asset)}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center text-gray-500 group-hover:text-indigo-600 transition-colors">
+                                            <Icon size={20} />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-semibold text-gray-900">{asset.name}</h4>
+                                            <p className="text-xs text-gray-500 font-mono">{asset.serial}</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <h4 className="text-sm font-semibold text-gray-900">{asset.name}</h4>
-                                        <p className="text-xs text-gray-500 font-mono">{asset.serial}</p>
+                                    <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                                        <Plus size={14} />
                                     </div>
                                 </div>
-                                <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                                    <Plus size={14} />
-                                </div>
-                            </div>
-                        ))
+                            );
+                        })
                     ) : (
                         <div className="text-center py-10 text-gray-400">
                             <Package size={32} className="mx-auto mb-2 opacity-50" />
@@ -170,25 +205,28 @@ const AssetAllocation = () => {
 
                             {allocatedAssets.length > 0 ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {allocatedAssets.map((asset) => (
-                                        <div key={asset.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between group animate-in fade-in zoom-in duration-200">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center">
-                                                    <asset.icon size={20} />
+                                    {allocatedAssets.map((asset) => {
+                                        const Icon = getIcon(asset.type);
+                                        return (
+                                            <div key={asset.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between group animate-in fade-in zoom-in duration-200">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center">
+                                                        <Icon size={20} />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-sm font-semibold text-gray-900">{asset.name}</h4>
+                                                        <p className="text-xs text-gray-500 font-mono">{asset.serial}</p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <h4 className="text-sm font-semibold text-gray-900">{asset.name}</h4>
-                                                    <p className="text-xs text-gray-500 font-mono">{asset.serial}</p>
-                                                </div>
+                                                <button
+                                                    onClick={() => handleRemove(asset)}
+                                                    className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                >
+                                                    <X size={16} />
+                                                </button>
                                             </div>
-                                            <button
-                                                onClick={() => handleRemove(asset)}
-                                                className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                            >
-                                                <X size={16} />
-                                            </button>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             ) : (
                                 <div className="h-40 flex flex-col items-center justify-center text-gray-400">

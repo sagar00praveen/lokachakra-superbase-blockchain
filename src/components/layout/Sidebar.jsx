@@ -11,20 +11,20 @@ const Sidebar = () => {
     // Define menus for each role
     const roleMenus = {
         hr: [
-            { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-            { icon: FileText, label: 'Add Candidate', path: '/add-candidate' },
+            { icon: LayoutDashboard, label: 'Dashboard', path: '/hr/dashboard' },
+            { icon: FileText, label: 'Add Candidate', path: '/hr/add-candidate' },
             { icon: Video, label: 'Orientations', path: '/hr/orientations' },
             { icon: FolderCheck, label: 'Documents', path: '/hr/documents' },
         ],
         it: [
-            { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
+            { icon: LayoutDashboard, label: 'Dashboard', path: '/it/dashboard' },
             { icon: FileText, label: 'IT Request', path: '/it/requests' },
             { icon: Monitor, label: 'Asset Management', path: '/it/assets' },
             { icon: Video, label: 'Orientation', path: '/it/orientations' },
             { icon: Settings, label: 'Settings', path: '/it/settings' },
         ],
         candidate: [
-            { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
+            { icon: LayoutDashboard, label: 'Dashboard', path: '/candidate/dashboard' },
             { icon: Bell, label: 'Notifications', path: '/candidate/notifications' },
             { icon: Video, label: 'My Orientations', path: '/candidate/orientations' },
             { icon: CheckSquare, label: 'Accept Offer', path: '/candidate/accept-offer' },
@@ -34,7 +34,7 @@ const Sidebar = () => {
             { icon: Monitor, label: 'Device Receipt', path: '/candidate/device' },
         ],
         admin: [
-            { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
+            { icon: LayoutDashboard, label: 'Dashboard', path: '/admin/dashboard' },
             { icon: Users, label: 'Teams Overview', path: '/admin/teams' },
             { icon: UserCheck, label: 'Employees', path: '/admin/employees' },
             { icon: BarChart2, label: 'Analytics', path: '/admin/analytics' },

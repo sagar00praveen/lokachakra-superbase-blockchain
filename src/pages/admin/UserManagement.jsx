@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { fetchProfiles } from '../../services/api';
 import {
     Users, Plus, Search, Edit2, Trash2, X,
     CheckCircle2, AlertCircle, Shield, Mail,
@@ -33,16 +34,27 @@ const UserManagement = () => {
 
     const fetchUsers = async () => {
         setIsLoading(true);
-        // Simulate API call
-        setTimeout(() => {
-            setUsers([
-                { id: 1, fullName: 'Priya Sharma', email: 'priya.sharma@lokachakra.com', role: 'HR', status: 'Active' },
-                { id: 2, fullName: 'Vikram Singh', email: 'vikram.singh@lokachakra.com', role: 'IT', status: 'Active' },
-                { id: 3, fullName: 'Admin User', email: 'admin@lokachakra.com', role: 'Admin', status: 'Active' },
-                { id: 4, fullName: 'Rajesh Kumar', email: 'rajesh.kumar@email.com', role: 'Manager', status: 'Inactive' },
-            ]);
+        try {
+            const data = await fetchProfiles();
+            if (data) {
+                // Map Supabase profile structure to component's expected structure if needed
+                // Assuming schema: id, full_name, role, email...
+                // Component expects: id, fullName, email, role, status
+                const mappedUsers = data.map(u => ({
+                    id: u.id,
+                    fullName: u.full_name || 'N/A',
+                    email: u.email,
+                    role: u.role || 'Employee', // Capitalize if needed
+                    status: 'Active' // Default status as it's not in profile schema yet, or fetch if added
+                }));
+                setUsers(mappedUsers);
+            }
+        } catch (error) {
+            console.error("Failed to fetch users", error);
+            // Fallback or toast
+        } finally {
             setIsLoading(false);
-        }, 1000);
+        }
     };
 
     // Derived State
