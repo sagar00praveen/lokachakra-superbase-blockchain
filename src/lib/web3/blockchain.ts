@@ -65,20 +65,27 @@ export const initializeEmployeeOnChain = async (employeeId: string, companyId: s
     return tx;
 };
 
-export const recordDocumentProofOnChain = async (employeeId: string, documentHashHex: string) => {
-    // 1. Ensure Wallet is Connected
-    if (!(window as any).solana) throw new Error("Wallet not found");
-    if (!(window as any).solana.isConnected) {
-        await (window as any).solana.connect();
-    }
+// Operational Wallet (Public Key)
+const OPERATIONAL_PUBKEY_STR = import.meta.env.VITE_OPERATIONAL_PUBKEY;
 
-    const program = getProgram();
-    const provider = getProvider();
+export const recordDocumentProofOnChain = async (employeeId: string, documentHashHex: string) => {
+    // 1. Validate Env
+    if (!OPERATIONAL_PUBKEY_STR) throw new Error("VITE_OPERATIONAL_PUBKEY is not set.");
+    const operationalPubKey = new PublicKey(OPERATIONAL_PUBKEY_STR);
+
+    // 2. Setup Connection & Dummy Provider (So Anchor can build instruction)
+    const connection = new Connection(rpcUrl, opts.preflightCommitment);
+    const dummyWallet = {
+        publicKey: operationalPubKey,
+        signTransaction: () => Promise.reject(new Error("Client cannot sign for Operational Wallet")),
+        signAllTransactions: () => Promise.reject(new Error("Client cannot sign for Operational Wallet"))
+    };
+    const provider = new AnchorProvider(connection, dummyWallet as any, opts);
+    const program = new Program(idl as any, provider);
 
     const encoder = new TextEncoder();
     const empData = encoder.encode(employeeId);
     const empHashBuffer = await crypto.subtle.digest('SHA-256', empData);
-    const empHashArray = Array.from(new Uint8Array(empHashBuffer));
 
     // Derive Employee PDA
     const [employeePda] = await PublicKey.findProgramAddress(
@@ -89,14 +96,13 @@ export const recordDocumentProofOnChain = async (employeeId: string, documentHas
         program.programId
     );
 
-    // 2. Check if Employee Account exists; if not, initialize it
+    // 3. Check if Employee Account exists (Read-Only)
     try {
-        const account = await program.account.employeeAccount.fetch(employeePda);
-        console.log("Employee Account found:", account);
+        await program.account.employeeAccount.fetch(employeePda);
     } catch (e) {
-        console.log("Employee Account not found. Initializing...", e);
-        // Auto-initialize with dummy Company ID for now
-        await initializeEmployeeOnChain(employeeId, "LOKACHAKRA_US_INC");
+        console.log("Employee Account not found. Initialization is required (via separate flow/user).", e);
+        // We might want to handle this gracefully or throw. 
+        // For now, assuming Employee exists or User must initialize separately.
     }
 
     // Convert hex string to u8 array for document hash
@@ -105,7 +111,7 @@ export const recordDocumentProofOnChain = async (employeeId: string, documentHas
     );
     const docHashArray = Array.from(docHashBytes);
 
-    // Proof PDA: seeds = [b"proof", document_hash]
+    // Proof PDA
     const [proofPda] = await PublicKey.findProgramAddress(
         [
             utils.bytes.utf8.encode("proof"),
@@ -114,25 +120,57 @@ export const recordDocumentProofOnChain = async (employeeId: string, documentHas
         program.programId
     );
 
-    // 3. Check if Document Proof already exists
+    // 4. Check if Proof exists
     try {
         const proofAccount = await program.account.documentProof.fetch(proofPda);
         console.log("Document Proof already exists on-chain:", proofAccount);
         return "ALREADY_VERIFIED";
     } catch (e) {
-        console.log("Document Proof not found. Creating new proof...", e);
+        // Continue
     }
 
-    const tx = await program.methods.recordDocumentProof(docHashArray)
+    // 5. Build Transaction Instruction
+    // Authority => Operational Wallet
+    const instruction = await program.methods.recordDocumentProof(docHashArray)
         .accounts({
             documentProof: proofPda,
             employeeAccount: employeePda,
-            authority: provider.wallet.publicKey,
+            authority: operationalPubKey, // Operational Wallet is Authority & Payer
             systemProgram: web3.SystemProgram.programId,
         })
-        .rpc();
+        .instruction();
 
-    console.log("Proof Recorded! Tx:", tx);
-    return tx;
+    // 6. Construct Transaction
+    const { blockhash } = await connection.getLatestBlockhash();
+    const transaction = new web3.Transaction();
+    transaction.recentBlockhash = blockhash;
+    transaction.feePayer = operationalPubKey;
+    transaction.add(instruction);
+
+    // 7. Serialize (Unsigned)
+    const serializedTransaction = transaction.serialize({ requireAllSignatures: false });
+    const transactionBase64 = serializedTransaction.toString('base64');
+
+    // 8. Send to Backend for Signing & Broadcast
+    console.log("Delegating signature to Operational Wallet...");
+
+    // Determine API Endpoint (Vercel or Local Proxy)
+    // Assuming relative path works if served correctly, otherwise configured base URL
+    const apiUrl = '/api/sign-transaction';
+
+    const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactionBase64 })
+    });
+
+    if (!response.ok) {
+        const err = await response.json();
+        throw new Error(`Transaction Signing Failed: ${err.error || response.statusText}`);
+    }
+
+    const { signature } = await response.json();
+    console.log("Proof Recorded via Operational Wallet! Sig:", signature);
+    return signature;
 };
 

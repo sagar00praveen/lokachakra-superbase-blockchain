@@ -18,7 +18,11 @@ dist-ssr
 .idea
 .DS_Store
 *.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+
+# Wallets
+wallets/
+*.json
+WALLET_KEYS_BASE58.txt
+
+.vercel
+.env*.local
